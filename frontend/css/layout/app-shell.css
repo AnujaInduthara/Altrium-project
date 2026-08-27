@@ -1,0 +1,87 @@
+/* ============================================================================
+   App shell — the common layout for every signed-in page.
+
+     ┌──────────────────────────────┐
+     │ header (full width, sticky)  │
+     ├─────────┬────────────────────┤
+     │ sidebar │ main (page content)│
+     └─────────┴────────────────────┘
+
+   Built by js/components/AppShell.js.
+   ========================================================================== */
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: var(--header-height) 1fr;
+  grid-template-areas:
+    "header header"
+    "sidebar main";
+  background: var(--color-surface-muted);
+}
+
+.app-shell > .app-header {
+  grid-area: header;
+}
+
+.app-shell > .sidebar {
+  grid-area: sidebar;
+}
+
+.app-shell__main {
+  grid-area: main;
+  min-width: 0;
+  padding: var(--shell-gutter);
+}
+
+.app-shell__content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Mobile backdrop behind the slide-in sidebar */
+.app-shell__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-backdrop);
+  background: rgba(16, 24, 40, 0.4);
+}
+
+/* ---------------------------------------------------------------------------
+   Responsive: collapse the sidebar into a slide-in drawer
+   ------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--header-height) 1fr;
+    grid-template-areas:
+      "header"
+      "main";
+  }
+
+  .app-shell > .sidebar {
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    transform: translateX(-100%);
+    transition: transform var(--transition-fast);
+    z-index: var(--z-sidebar);
+  }
+
+  .app-shell > .sidebar.is-open {
+    transform: none;
+  }
+
+  .app-shell__main {
+    padding: var(--space-4);
+  }
+}
+
+@media (min-width: 901px) {
+  .app-shell__backdrop {
+    display: none;
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where chrome *)",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Bash(sed -n 's/^STORAGE_KEY=//p;' /tmp/seed.txt)",
+      "Bash(sed -n 's/^DELETE_USER=//p' /tmp/seed.txt)",
+      "Bash(curl -s -o /dev/null -w \"be5000:%{http_code} \" --max-time 2 http://localhost:5000/api/hr/me)",
+      "Bash(curl -s -o /dev/null -w \"httpd5599:%{http_code}\\\\n\" --max-time 2 http://localhost:5599/login.html)",
+      "Bash(env)",
+      "Bash(node -e 'console.log\\(\"proxy:\", process.env.HTTP_PROXY, process.env.HTTPS_PROXY, process.env.http_proxy, process.env.NO_PROXY\\); console.log\\(\"undici?\", typeof fetch\\)')",
+      "Bash(NO_PROXY=\"*\" node -e 'fetch\\(\"http://127.0.0.1:5061/api/hr/me\"\\).then\\(r=>console.log\\(\"ok\",r.status\\)\\).catch\\(e=>console.log\\(\"ERR\",e.message,e.cause?.message\\)\\)')",
+      "Bash(npx --no-install serve --version)"
+    ]
+  }
+}

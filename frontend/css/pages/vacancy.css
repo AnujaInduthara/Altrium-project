@@ -1,0 +1,142 @@
+/* ============================================================================
+   Vacancy Details page (PB-02) — view one vacancy, publish a draft.
+   ========================================================================== */
+
+.back-link {
+  display: inline-block;
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.back-link:hover {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.vacancy-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.vacancy-detail__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.vacancy-detail__actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.vacancy-detail__actions .button {
+  white-space: nowrap;
+}
+
+.vacancy-detail__note {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+#vacancy-detail > .card {
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 560px) {
+  .vacancy-detail__actions {
+    width: 100%;
+  }
+
+  .vacancy-detail__actions .button {
+    width: 100%;
+  }
+}
+
+/* Definition list -------------------------------------------------------- */
+
+.detail-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.detail-list__row {
+  display: grid;
+  grid-template-columns: 12rem 1fr;
+  gap: var(--space-4);
+}
+
+.detail-list dt {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.detail-list dd {
+  margin: 0;
+}
+
+.detail-list__prose {
+  white-space: pre-wrap;
+}
+
+.detail-requirements {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* Published panel + copy row ------------------------------------------------ */
+
+.published-panel {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.published-panel__check {
+  color: var(--color-success);
+}
+
+.copy-row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.copy-row .field__input {
+  flex: 1;
+  padding-left: 0.9rem;
+  background: var(--color-surface-muted);
+}
+
+.copy-row .button {
+  flex-shrink: 0;
+}
+
+/* Responsive ------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .detail-list__row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+
+  .copy-row {
+    flex-direction: column;
+  }
+
+  .copy-row .button {
+    width: 100%;
+  }
+}

@@ -1,0 +1,36 @@
+/* ============================================================================
+   main.css — the single stylesheet each page links.
+   Import order matters: tokens → base → components → layout → pages.
+   ========================================================================== */
+
+/* Base */
+@import "base/tokens.css";
+@import "base/reset.css";
+@import "base/typography.css";
+
+/* Components (reusable, self-contained) */
+@import "components/brand.css";
+@import "components/button.css";
+@import "components/icon-button.css";
+@import "components/field.css";
+@import "components/card.css";
+@import "components/alert.css";
+@import "components/badge.css";
+@import "components/divider.css";
+@import "components/app-header.css";
+@import "components/sidebar.css";
+@import "components/user-menu.css";
+@import "components/page-header.css";
+@import "components/modal.css";
+
+/* Layout */
+@import "layout/auth.css";
+@import "layout/app-shell.css";
+
+/* Pages */
+@import "pages/login.css";
+@import "pages/dashboard.css";
+@import "pages/vacancies.css";
+@import "pages/create-vacancy.css";
+@import "pages/vacancy.css";
+@import "pages/apply.css";

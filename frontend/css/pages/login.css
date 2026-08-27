@@ -1,0 +1,31 @@
+/* ============================================================================
+   Login page — composition-only styles (layout + components do the rest)
+   ========================================================================== */
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.login-form__forgot {
+  align-self: flex-end;
+  margin-top: calc(var(--space-2) * -1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.login-form__submit {
+  margin-top: var(--space-2);
+}
+
+.login-form__divider {
+  margin-top: var(--space-5);
+}
+
+.login-form__footnote {
+  margin-top: var(--space-4);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

@@ -1,0 +1,41 @@
+/* ============================================================================
+   Icon button — a square, borderless button holding a single 24px icon
+   ========================================================================== */
+
+.icon-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.icon-button:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.icon-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Small notification indicator in the top-right corner */
+.icon-button__dot {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+}

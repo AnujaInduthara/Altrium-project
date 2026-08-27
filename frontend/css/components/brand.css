@@ -1,0 +1,21 @@
+/* ============================================================================
+   Brand lockup — the Altrium logo
+   ========================================================================== */
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+}
+
+.brand__logo {
+  height: 2rem;
+  width: auto;
+}
+
+.brand--sm .brand__logo {
+  height: 1.75rem;
+}
+
+.brand--lg .brand__logo {
+  height: 2.5rem;
+}

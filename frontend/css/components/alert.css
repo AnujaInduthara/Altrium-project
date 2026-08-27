@@ -1,0 +1,20 @@
+/* ============================================================================
+   Alert — form-level feedback banner (see js/components/Alert.js)
+   ========================================================================== */
+
+.alert {
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.alert--error {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.alert--success {
+  color: var(--color-success);
+  background: var(--color-success-bg);
+}

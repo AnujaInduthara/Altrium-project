@@ -1,0 +1,59 @@
+/* ============================================================================
+   Public application page (PB-02 scope — resolve a published vacancy).
+   Standalone: no app shell, no auth.
+   ========================================================================== */
+
+.apply {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 100vh;
+}
+
+.apply__brand {
+  align-self: flex-start;
+}
+
+.apply__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.apply__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.apply__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.apply__section-title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.apply__prose {
+  white-space: pre-wrap;
+}
+
+.apply__notice {
+  text-align: left;
+}
+
+.apply__footer {
+  margin-top: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+  text-align: center;
+}

@@ -1,0 +1,19 @@
+/* ============================================================================
+   Page header — the title block at the top of a shell page.
+   Generic; every section page can reuse it.
+   ========================================================================== */
+
+.page-header {
+  margin-bottom: var(--space-6);
+}
+
+.page-header__title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.page-header__subtitle {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+}

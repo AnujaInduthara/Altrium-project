@@ -1,0 +1,94 @@
+/* ============================================================================
+   Create Vacancy page — composition only (app shell + field/button/card/badge
+   components do the rest). PB-01.
+   ========================================================================== */
+
+.vacancy-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.vacancy-form__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  border: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.vacancy-form__legend {
+  padding: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.vacancy-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.vacancy-form__positions {
+  max-width: 12rem;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* Success view --------------------------------------------------------------- */
+
+.vacancy-success {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.vacancy-success__icon {
+  width: 3rem;
+  height: 3rem;
+  color: var(--color-success);
+}
+
+.vacancy-success__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.vacancy-success__actions {
+  margin-top: var(--space-3);
+}
+
+/* Responsive --------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .vacancy-form__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .form-actions .button {
+    width: 100%;
+  }
+
+  .vacancy-form__positions {
+    max-width: none;
+  }
+}

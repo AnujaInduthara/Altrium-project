@@ -1,0 +1,112 @@
+/* ============================================================================
+   User menu — avatar + name/email badge with a dropdown (Sign out)
+   ========================================================================== */
+
+.user-menu {
+  position: relative;
+}
+
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.35rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.user-badge:hover {
+  background: var(--color-surface-muted);
+}
+
+.user-badge__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+}
+
+.user-badge__avatar svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.user-badge__info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+
+.user-badge__name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.user-badge__email {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.user-badge__chevron {
+  width: 1rem;
+  height: 1rem;
+  color: var(--color-text-subtle);
+}
+
+/* Dropdown ------------------------------------------------------------------- */
+
+.user-menu__dropdown {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  min-width: 11rem;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.user-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-menu__item:hover {
+  background: var(--color-surface-muted);
+}
+
+.user-menu__icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--color-text-muted);
+}
+
+/* On narrow screens keep just the avatar */
+@media (max-width: 600px) {
+  .user-badge__info,
+  .user-badge__chevron {
+    display: none;
+  }
+}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Vacancies — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app" data-active-nav="vacancies">
+    <section class="page" id="vacancies-page" hidden>
+      <header class="page-header vacancies-header">
+        <div>
+          <h1 class="page-header__title">Job Vacancies</h1>
+          <p class="page-header__subtitle">Create and manage your job vacancy drafts.</p>
+        </div>
+        <a class="button button--primary" href="create-vacancy.html">Create New Vacancy</a>
+      </header>
+
+      <div class="alert" id="vacancies-alert" role="alert" aria-live="assertive" hidden></div>
+
+      <p class="status-message" id="vacancies-loading">Loading vacancies…</p>
+
+      <!-- Empty state -->
+      <div class="card empty-state" id="vacancies-empty" hidden>
+        <h2 class="heading-lg">No job vacancies yet</h2>
+        <p class="text-muted">Create your first vacancy to get started.</p>
+        <a class="button button--primary" href="create-vacancy.html">Create New Vacancy</a>
+      </div>
+
+      <!-- List -->
+      <ul class="vacancy-list" id="vacancies-list" hidden></ul>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/vacanciesPage.js"></script>
+</body>
+</html>

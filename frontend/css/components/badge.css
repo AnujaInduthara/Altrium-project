@@ -1,0 +1,32 @@
+/* ============================================================================
+   Badge — small status pill (e.g. a vacancy's DRAFT / PUBLISHED / CLOSED state)
+   ========================================================================== */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.6;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+}
+
+.badge--draft {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+
+.badge--published {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge--closed {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}

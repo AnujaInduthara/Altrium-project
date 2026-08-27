@@ -1,0 +1,63 @@
+/* ============================================================================
+   Modal — centred confirmation dialog (see js/components/Modal.js)
+   ========================================================================== */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.45);
+}
+
+.modal__dialog {
+  position: relative;
+  width: 100%;
+  max-width: 26rem;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-6);
+  animation: modal-in var(--transition-fast) ease both;
+}
+
+.modal__title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.modal__body {
+  margin-top: var(--space-3);
+}
+
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@media (max-width: 420px) {
+  .modal__actions {
+    flex-direction: column-reverse;
+  }
+
+  .modal__actions .button {
+    width: 100%;
+  }
+}

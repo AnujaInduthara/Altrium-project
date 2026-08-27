@@ -1,0 +1,27 @@
+/* ============================================================================
+   Dashboard page — content only. The header + sidebar come from the app shell
+   (css/layout/app-shell.css). Kept intentionally light for now.
+   ========================================================================== */
+
+.page {
+  animation: page-fade var(--transition-fast) ease both;
+}
+
+.status-message {
+  color: var(--color-text-muted);
+}
+
+.dashboard-quick-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+@keyframes page-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}

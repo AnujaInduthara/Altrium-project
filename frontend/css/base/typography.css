@@ -1,0 +1,35 @@
+/* ============================================================================
+   Typography helpers
+   ========================================================================== */
+
+.heading-xl {
+  font-size: var(--text-3xl);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.heading-lg {
+  font-size: var(--text-xl);
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-sm {
+  font-size: var(--text-sm);
+}
+
+/* The amber full-stop used in the "Welcome Back!" hero */
+.accent-dot {
+  color: var(--color-primary);
+}
+
+@media (max-width: 600px) {
+  .heading-xl {
+    font-size: var(--text-2xl);
+  }
+}

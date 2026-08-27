@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -f C:/Users/kavee/AppData/Local/Temp/claude/c--Chan-Inside-Profile-Projects-my-project/99584166-3190-4fc7-914a-a402a7ee6eab/scratchpad/*.mjs)",
+      "Bash(pkill -f \"remote-debugging-port\")",
+      "Bash(pkill -f \"http.server\")",
+      "Bash(node \"C:/Users/kavee/AppData/Local/Temp/claude/c--Chan-Inside-Profile-Projects-my-project/7edca4f9-2aff-4ff6-87aa-9c6b7217aad9/scratchpad/validate.test.js\")",
+      "Bash(node \"C:/Users/kavee/AppData/Local/Temp/claude/c--Chan-Inside-Profile-Projects-my-project/7edca4f9-2aff-4ff6-87aa-9c6b7217aad9/scratchpad/probe.mjs\")",
+      "Bash(node _pb01_probe.cjs)",
+      "Bash(ITEST_PORT=5055 node _pb01_itest.cjs)",
+      "Read(//tmp/**)",
+      "Bash(pkill -f \"src/server.js\")",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs -r kill)",
+      "Bash(curl -s -o /dev/null -w \"server still up? %{http_code}\\\\n\" http://localhost:5055/api/hr/me)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" --max-time 2 http://localhost:5055/api/hr/me)",
+      "Read(//c/tmp/**)",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --no-sandbox --virtual-time-budget=8000 --run-all-compositor-stages-before-draw --dump-dom \"http://localhost:5599/create-vacancy.html\")",
+      "Bash(node _pb01_seed.cjs)"
+    ]
+  }
+}

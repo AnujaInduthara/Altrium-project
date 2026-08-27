@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Login — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div class="auth">
+    <a class="brand auth__brand" href="index.html">
+      <img class="brand__logo" src="assets/icons/altrium-logo.png" alt="Altrium" />
+    </a>
+
+    <!-- Hero / marketing panel -->
+    <section class="auth__panel auth__panel--hero">
+      <div class="auth-hero">
+        <h1 class="heading-xl">Welcome<br />Back!<span class="accent-dot">.</span></h1>
+        <p class="auth-hero__text">
+          Sign in to your account to continue managing your recruitment process
+          efficiently.
+        </p>
+
+        <div class="auth-hero__feature">
+          <span class="auth-hero__feature-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </span>
+          <div>
+            <p class="auth-hero__feature-title">Smart Hiring, Better Future.</p>
+            <p class="auth-hero__feature-text">
+              Streamline your hiring workflow with AI-powered insights.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Form panel -->
+    <section class="auth__panel auth__panel--form">
+      <div class="card auth__card">
+        <header class="card__header">
+          <h2 class="card__title">User Login</h2>
+          <p class="card__subtitle">Enter your credentials to access your account</p>
+        </header>
+
+        <form id="login-form" class="login-form" novalidate>
+          <!-- Email -->
+          <div class="field" data-field="email">
+            <label class="field__label" for="email">Email Address</label>
+            <div class="field__control">
+              <svg class="field__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+              <input
+                class="field__input"
+                type="email"
+                id="email"
+                name="email"
+                autocomplete="username"
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+            <p class="field__error" id="email-error" role="alert"></p>
+          </div>
+
+          <!-- Password -->
+          <div class="field" data-field="password">
+            <label class="field__label" for="password">Password</label>
+            <div class="field__control">
+              <svg class="field__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <input
+                class="field__input"
+                type="password"
+                id="password"
+                name="password"
+                autocomplete="current-password"
+                placeholder="Enter your password"
+                required
+              />
+              <button
+                type="button"
+                class="field__addon"
+                aria-pressed="false"
+                aria-label="Show password"
+              >
+                <svg class="field__addon-icon" data-icon="show" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round" aria-hidden="true">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <svg class="field__addon-icon" data-icon="hide" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round" aria-hidden="true">
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19" />
+                  <path d="M6.61 6.61A18.5 18.5 0 0 0 2 12s3.5 8 10 8a9.12 9.12 0 0 0 5.39-1.61" />
+                  <line x1="2" y1="2" x2="22" y2="22" />
+                </svg>
+              </button>
+            </div>
+            <p class="field__error" id="password-error" role="alert"></p>
+          </div>
+
+          <a class="login-form__forgot" href="#">Forgot Password?</a>
+
+          <div class="alert" id="form-alert" role="alert" aria-live="assertive" hidden></div>
+
+          <button
+            type="submit"
+            id="submit-btn"
+            class="button button--primary button--block login-form__submit"
+          >
+            <span data-label>Login</span>
+          </button>
+        </form>
+
+        <div class="divider login-form__divider" role="presentation">OR</div>
+
+        <p class="login-form__footnote">
+          Don't have an account? <a href="#">Contact your administrator.</a>
+        </p>
+      </div>
+    </section>
+
+    <footer class="auth__footer">© 2025 Altrium Solutions. All rights reserved.</footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/loginPage.js"></script>
+</body>
+</html>

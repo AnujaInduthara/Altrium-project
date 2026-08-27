@@ -1,0 +1,43 @@
+/* ============================================================================
+   App header — top bar: brand (left), notifications + user menu (right)
+   ========================================================================== */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--header-height);
+  padding: 0 var(--space-5);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-header__brand {
+  /* keep the logo aligned over the sidebar column on desktop */
+  flex-shrink: 0;
+}
+
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* Hamburger — hidden on desktop, shown when the sidebar collapses */
+.app-header__menu {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .app-header {
+    padding: 0 var(--space-4);
+  }
+
+  .app-header__menu {
+    display: inline-flex;
+  }
+}

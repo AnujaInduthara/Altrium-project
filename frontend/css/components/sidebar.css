@@ -1,0 +1,51 @@
+/* ============================================================================
+   Sidebar — primary navigation (see js/config/navigation.js)
+   ========================================================================== */
+
+.sidebar {
+  position: sticky;
+  top: var(--header-height);
+  align-self: start;
+  height: calc(100vh - var(--header-height));
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.sidebar__item:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.sidebar__item.is-active {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-active);
+  font-weight: 600;
+}
+
+.sidebar__icon {
+  flex-shrink: 0;
+  width: 1.15rem;
+  height: 1.15rem;
+}

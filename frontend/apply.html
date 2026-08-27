@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apply — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <main class="apply">
+    <a class="brand apply__brand" href="index.html">
+      <img class="brand__logo" src="assets/icons/altrium-logo.png" alt="Altrium" />
+    </a>
+
+    <p class="status-message" id="apply-loading">Loading vacancy…</p>
+
+    <div class="card apply__card" id="apply-unavailable" hidden>
+      <h1 class="heading-lg">This job vacancy is not available</h1>
+      <p class="text-muted">
+        The link may be incorrect, or the vacancy is no longer open for
+        applications.
+      </p>
+    </div>
+
+    <div class="card apply__card" id="apply-vacancy" hidden>
+      <header class="apply__header">
+        <h1 class="heading-lg" id="apply-title"></h1>
+        <p class="text-muted" id="apply-meta"></p>
+      </header>
+
+      <section class="apply__section">
+        <h2 class="apply__section-title">About the role</h2>
+        <p class="apply__prose" id="apply-description"></p>
+      </section>
+
+      <section class="apply__section">
+        <h2 class="apply__section-title">Requirements</h2>
+        <ul class="detail-requirements" id="apply-requirements"></ul>
+      </section>
+
+      <div class="alert alert--success apply__notice">
+        Online applications for this vacancy will open here soon.
+      </div>
+    </div>
+
+    <footer class="apply__footer">© 2025 Altrium Solutions. All rights reserved.</footer>
+  </main>
+
+  <script type="module" src="js/pages/applyPage.js"></script>
+</body>
+</html>

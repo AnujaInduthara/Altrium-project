@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <!-- The app shell (header + sidebar) is injected around this container by
+       js/components/AppShell.js. Only page-specific content lives here. -->
+  <div id="app" data-active-nav="dashboard">
+    <section class="page" id="dashboard-content" hidden>
+      <header class="page-header">
+        <h1 class="page-header__title">Dashboard</h1>
+        <p class="page-header__subtitle">
+          Welcome back, <strong id="user-email"></strong>. Here's what's happening today.
+        </p>
+      </header>
+
+      <div class="card dashboard-quick-action">
+        <div>
+          <h2 class="heading-lg">Job Vacancies</h2>
+          <p class="text-muted text-sm">Create a new vacancy or review your existing drafts.</p>
+        </div>
+        <a class="button button--primary" href="vacancies.html">Go to Job Vacancies</a>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/dashboardPage.js"></script>
+</body>
+</html>

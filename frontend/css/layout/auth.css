@@ -1,0 +1,123 @@
+/* ============================================================================
+   Auth layout — split screen: marketing hero (left) + form panel (right)
+   ========================================================================== */
+
+.auth {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+}
+
+.auth__panel {
+  display: flex;
+  min-width: 0; /* let the grid track shrink below the panel's content size */
+  padding: var(--space-7) var(--space-6);
+}
+
+.auth__panel--form {
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hero -------------------------------------------------------------------- */
+
+.auth__panel--hero {
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-6);
+  background-color: var(--color-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='104' viewBox='0 0 60 104'%3E%3Cpath d='M30 1 59 18v34L30 69 1 52V18z M30 69 59 86v34M30 69 1 86v34' fill='none' stroke='%23F1EEE8' stroke-width='2'/%3E%3C/svg%3E");
+  background-position: center;
+}
+
+.auth__brand {
+  position: absolute;
+  top: var(--space-6);
+  left: var(--space-6);
+}
+
+.auth-hero {
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.auth-hero__text {
+  color: var(--color-text-muted);
+  font-size: var(--text-lg);
+}
+
+.auth-hero__feature {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.auth-hero__feature-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.auth-hero__feature-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.auth-hero__feature-title {
+  font-weight: 700;
+}
+
+.auth-hero__feature-text {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* Form panel ------------------------------------------------------------------ */
+
+.auth__card {
+  width: 100%;
+  max-width: 27rem;
+}
+
+/* Footer ------------------------------------------------------------------ */
+
+.auth__footer {
+  position: absolute;
+  bottom: var(--space-5);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}
+
+/* Responsive ---------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .auth {
+    display: block;
+  }
+
+  .auth__panel--hero {
+    display: none;
+  }
+
+  .auth__panel--form {
+    min-height: 100vh;
+    padding: var(--space-7) var(--space-4) var(--space-6);
+  }
+
+  .auth__brand {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}

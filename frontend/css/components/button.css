@@ -1,0 +1,60 @@
+/* ============================================================================
+   Button — .button with modifiers
+   ========================================================================== */
+
+.button {
+  --_bg: var(--color-surface);
+  --_fg: var(--color-text);
+  --_border: var(--color-border-strong);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0.75rem 1.25rem;
+  border: 1px solid var(--_border);
+  border-radius: var(--radius-md);
+  background: var(--_bg);
+  color: var(--_fg);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* Modifiers ------------------------------------------------------------------ */
+
+.button--primary {
+  --_bg: var(--color-primary);
+  --_fg: var(--color-primary-contrast);
+  --_border: var(--color-primary);
+}
+
+.button--primary:hover:not(:disabled) {
+  --_bg: var(--color-primary-hover);
+  --_border: var(--color-primary-hover);
+}
+
+.button--primary:active:not(:disabled) {
+  --_bg: var(--color-primary-active);
+  --_border: var(--color-primary-active);
+}
+
+.button--ghost {
+  --_bg: transparent;
+  --_border: var(--color-border-strong);
+}
+
+.button--ghost:hover:not(:disabled) {
+  --_bg: var(--color-surface-muted);
+}
+
+.button--block {
+  width: 100%;
+}
