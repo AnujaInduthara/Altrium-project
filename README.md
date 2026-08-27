@@ -474,6 +474,79 @@ Initial screening is still automatic and fire-and-forget after an application is
 `screeningPipeline` (the full extract → prompt → validate → score pipeline with
 an injected fake provider — no network).
 
+## PB-06: HR reviews the AI-filtered applicants
+
+The **human review** stage. HR opens a vacancy's **AI Screening** page, sees its
+applicants ranked by the AI CV-match score PB-05 already stored, and opens an
+individual **Applicant Review**. Everything here is **read-only** — opening an
+applicant never re-runs AI screening and never changes the application, its
+status, the score, the ranking or the summary. Candidate selection is PB-07 and
+is deliberately absent: there is no hire / reject / shortlist / "move to
+interview" action.
+
+### Flow
+
+```
+Vacancies → open a published vacancy → "View AI screening"
+      │      (or the AI Screening sidebar item → pick a vacancy)
+      ▼
+ai-screening.html#vacancy=<id>
+      │  GET /api/vacancies/:id/applications   (owner-checked; each row carries its `screening`)
+      ▼
+Applicants ranked by score (highest first); summary shows
+count / screened / average score / top match
+      │  "View" on a row
+      ▼
+applicant-review.html#id=<applicationId>&vacancy=<vacancyId>
+      │  GET /api/applications/:id/review    (owner-checked)
+      ▼
+Applicant details + AI Screening Score + rank + recommendation
++ matched / missing skills + experience & education match + AI summary
+      │  "View CV" / "Download CV"
+      ▼
+GET /api/applications/:id/cv[?download=1]  →  short-lived signed URL (120s, private bucket)
+```
+
+### API
+
+| endpoint | notes |
+|---|---|
+| `GET /api/applications/:id/review` | **new.** HR only, owner-checked via the parent vacancy. Returns `{ application, vacancy, screening }` — applicant contact details, the vacancy summary, and the stored screening result (via the same public-safe projection and advisory `ai_screening_rank` as the list). An application under another HR user's vacancy is reported as `404`, so nothing leaks. Read-only. |
+| `GET /api/applications/:id/cv` | unchanged, plus an optional `?download=1` that mints the signed URL with a `download` disposition (used by "Download CV" and for DOCX files browsers cannot preview inline). |
+| `GET /api/vacancies/:id/applications` | unchanged — already returns each application's `screening` summary; the AI Screening list now also shows the vacancy header (title · department · location) and average / top score. |
+
+### Database
+
+**No schema changes.** `application_screenings` (migration `005`) already stores
+the score, recommendation, matched / missing skills, experience & education
+match and summary. Ranking is derived deterministically from the persisted
+score (highest first; unscored last) — the same ordering the list and the
+review page share.
+
+### Security
+
+- Every PB-06 route is `authenticateUser` + `requireHR`, then an explicit
+  "caller owns the parent vacancy" check (`getVacancyForUser`) before any
+  applicant data or CV is returned. Changing `vacancyId` / `applicationId` in a
+  URL to someone else's data returns `404`.
+- CVs stay in the **private** `candidate-cvs` bucket and are only ever reached
+  through a 120-second signed URL minted server-side; the service-role key is
+  never exposed to the browser.
+- The review payload is a deliberate projection — no `cv_path`, no
+  `error_detail`, no internal screening diagnostics.
+
+### Frontend
+
+- `ai-screening.html` / `aiScreeningPage.js` — the ranked list (from PB-05) gains
+  a vacancy header, average / top-score summary items, a per-row **View** action
+  and a footer reminder that the results are advisory.
+- `applicant-review.html` / `applicantReviewPage.js` / `css/pages/applicant-review.css`
+  — **new** read-only applicant review screen (breadcrumb, applicant info, AI
+  score + meter + rank, matched / missing skill chips, experience & education
+  match, AI summary, View / Download CV, loading / empty-pending / error /
+  CV-unavailable states, "recommendations only" disclaimer).
+- `vacancy.html` — the published panel gains a **View AI screening** link.
+
 ## Project structure
 
 ```
@@ -592,8 +665,11 @@ Done: Step 0 (HR Login), PB-01 (Create Job Vacancy — draft), PB-02 (Publish
 Vacancy — public link generated), PB-03 (Applicant submits a CV application),
 PB-04 partial (HR reviews the application list + opens CVs), PB-05 (AI-assisted
 CV screening — score, recommendation, matched/missing skills, summary stored per
-application; advisory only).
+application; advisory only), PB-06 (HR reviews the AI-filtered applicants —
+ranked AI Screening list + read-only Applicant Review with secure CV access).
 
-Not yet implemented: PB-06 AI-filtered applicant review UI, PB-07 candidate
-selection, PB-08 vacancy closing. Application `status` stays `submitted` — the
-AI screening pipeline never changes it, and no HR status transitions exist yet.
+Not yet implemented: PB-07 candidate selection, PB-08 vacancy closing.
+Application `status` stays `submitted` — neither the AI screening pipeline nor
+PB-06 changes it, and no HR status transitions exist yet.
+
+

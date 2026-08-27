@@ -29,9 +29,22 @@ export const ApplicationService = {
   },
 
   // Short-lived signed URL for an application's CV (owner-checked server-side).
-  async getCvLink(applicationId) {
+  // Pass { download: true } to get a URL that forces a "save as" instead of
+  // opening the CV inline (PB-06 "Download CV").
+  async getCvLink(applicationId, { download = false } = {}) {
+    const query = download ? '?download=1' : '';
     const response = await fetch(
-      `${apiBase}/applications/${encodeURIComponent(applicationId)}/cv`,
+      `${apiBase}/applications/${encodeURIComponent(applicationId)}/cv${query}`,
+      { headers: await authHeaders() }
+    );
+    return toResult(response);
+  },
+
+  // PB-06: the read-only applicant-review payload for one application —
+  // applicant details + vacancy summary + stored AI screening result.
+  async getReview(applicationId) {
+    const response = await fetch(
+      `${apiBase}/applications/${encodeURIComponent(applicationId)}/review`,
       { headers: await authHeaders() }
     );
     return toResult(response);

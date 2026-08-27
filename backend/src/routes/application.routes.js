@@ -12,6 +12,10 @@ router.use(authenticateUser, requireHR);
 
 router.get('/:id/cv', applicationController.getApplicationCv);
 
+// PB-06 — the read-only applicant-review payload (applicant details + vacancy
+// summary + stored AI screening result), owner-checked.
+router.get('/:id/review', applicationController.getApplicationReview);
+
 // PB-05 — read the AI screening result, or (HR-authorized) retry a failed one.
 // AI screening is otherwise a system function: there is no endpoint that lets a
 // client trigger screening for an arbitrary application.

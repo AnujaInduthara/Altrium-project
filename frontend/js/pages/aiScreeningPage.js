@@ -73,6 +73,8 @@ const alert = createAlert($('screening-alert'));
 const select = $('vacancy-select');
 const runBtn = $('screening-run');
 const summaryEl = $('screening-summary');
+const vacancyEl = $('screening-vacancy');
+const footNoteEl = $('screening-foot-note');
 const loadingEl = $('screening-loading');
 const promptEl = $('screening-prompt');
 const emptyEl = $('screening-empty');
@@ -91,10 +93,24 @@ function setView(view) {
   emptyEl.hidden = view !== 'empty';
   listEl.hidden = view !== 'list';
   summaryEl.hidden = view !== 'list';
+  footNoteEl.hidden = view !== 'list';
+  // The vacancy sub-header is useful for both the populated list and the
+  // "no applications yet" empty state.
+  vacancyEl.hidden = view !== 'list' && view !== 'empty';
   if (view !== 'list') {
     runBtn.hidden = true;
     stopAutoRefresh();
   }
+}
+
+function renderVacancyHeader(vacancy) {
+  if (!vacancy || !vacancy.job_title) {
+    vacancyEl.hidden = true;
+    vacancyEl.textContent = '';
+    return;
+  }
+  const meta = [vacancy.department, vacancy.location].filter(Boolean).join(' · ');
+  vacancyEl.textContent = meta ? `${vacancy.job_title} — ${meta}` : vacancy.job_title;
 }
 
 function stopAutoRefresh() {
@@ -148,7 +164,7 @@ function summarize(applications) {
 
 // --- rendering ----------------------------------------------------------
 
-function renderSummary(counts, total) {
+function renderSummary(counts, total, applications) {
   const set = (sel, value, show = true) => {
     const el = summaryEl.querySelector(sel);
     el.textContent = value;
@@ -156,6 +172,22 @@ function renderSummary(counts, total) {
   };
   set('[data-summary-total]', `${total} applicant${total === 1 ? '' : 's'}`);
   set('[data-summary-completed]', `${counts.completed} screened`);
+
+  // Average / top AI score across the completed screenings only.
+  const scores = applications
+    .map((a) => screeningOf(a))
+    .filter((s) => s.status === 'completed' && typeof s.score === 'number')
+    .map((s) => s.score);
+  if (scores.length > 0) {
+    const avg = Math.round(scores.reduce((sum, n) => sum + n, 0) / scores.length);
+    const top = Math.max(...scores);
+    set('[data-summary-average]', `Average score ${avg}%`, true);
+    set('[data-summary-top]', `Top match ${top}%`, true);
+  } else {
+    set('[data-summary-average]', '', false);
+    set('[data-summary-top]', '', false);
+  }
+
   const running = counts.processing + counts.pending;
   set('[data-summary-running]', `${running} in progress`, running > 0);
   set('[data-summary-failed]', `${counts.failed} unavailable`, counts.failed > 0);
@@ -251,6 +283,16 @@ function renderCard(application, rank) {
     rerunBtn.textContent = 'Run screening';
   }
 
+  const viewLink = node.querySelector('[data-view]');
+  const vacancyId = select.value;
+  viewLink.href = vacancyId
+    ? `applicant-review.html#id=${encodeURIComponent(application.id)}&vacancy=${encodeURIComponent(vacancyId)}`
+    : `applicant-review.html#id=${encodeURIComponent(application.id)}`;
+  viewLink.setAttribute(
+    'aria-label',
+    `Review ${screening.candidate_name || application.full_name || 'applicant'}`
+  );
+
   const cvBtn = node.querySelector('[data-view-cv]');
   cvBtn.addEventListener('click', () => openCv(application.id, cvBtn));
   if (!rerunBtn.hidden) {
@@ -271,7 +313,7 @@ function renderList(applications) {
   listEl.replaceChildren(...nodes);
 
   const counts = summarize(applications);
-  renderSummary(counts, applications.length);
+  renderSummary(counts, applications.length, applications);
 
   const hasRunnable = counts.pending + counts.failed + counts.not_started > 0;
   runBtn.hidden = !hasRunnable;
@@ -407,6 +449,7 @@ async function loadScreenings(vacancyId, { silent = false } = {}) {
     }
 
     const applications = (body && body.data && body.data.applications) || [];
+    renderVacancyHeader(body && body.data && body.data.vacancy);
     if (applications.length === 0) {
       setView('empty');
     } else {
