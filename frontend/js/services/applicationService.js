@@ -36,4 +36,33 @@ export const ApplicationService = {
     );
     return toResult(response);
   },
+
+  // PB-05: the AI screening result for one application (owner-checked).
+  async getScreening(applicationId) {
+    const response = await fetch(
+      `${apiBase}/applications/${encodeURIComponent(applicationId)}/screening`,
+      { headers: await authHeaders() }
+    );
+    return toResult(response);
+  },
+
+  // PB-05: HR-authorized (re)run of one application's screening — failed,
+  // still-pending, or a completed one to re-run.
+  async retryScreening(applicationId) {
+    const response = await fetch(
+      `${apiBase}/applications/${encodeURIComponent(applicationId)}/screening/retry`,
+      { method: 'POST', headers: await authHeaders() }
+    );
+    return toResult(response);
+  },
+
+  // PB-05: bulk (re)run for a vacancy — queues every application whose screening
+  // has not completed (pending / failed / not started).
+  async runPendingScreenings(vacancyId) {
+    const response = await fetch(
+      `${apiBase}/vacancies/${encodeURIComponent(vacancyId)}/screenings/run-pending`,
+      { method: 'POST', headers: await authHeaders() }
+    );
+    return toResult(response);
+  },
 };

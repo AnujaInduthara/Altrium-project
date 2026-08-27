@@ -17,24 +17,44 @@ const SUPABASE_ANON_KEY = [
 //
 // Overrides, in priority order:
 //   1. window.__ALTRIUM_API_BASE__  — set it in a <script> before the app loads
-//   2. ?apiBase=<url> in the page URL (persisted to localStorage for later)
+//   2. ?apiBase=<url> in the page URL (persisted to localStorage for later).
+//      Use ?apiBase=  (empty), ?apiBase=reset or ?apiBase=default to CLEAR a
+//      previously-remembered override and go back to the default below.
 //   3. a hardcoded full URL below (uncomment for a fixed deployment)
 const API_BASE_URL = resolveApiBaseUrl();
 
 function resolveApiBaseUrl() {
+  const resolved = normalizeApiBase(pickRawApiBase());
+  try {
+    // Make it obvious in DevTools which backend the app is talking to — a stale
+    // remembered ?apiBase= is the usual cause of "Resource not found." errors.
+    console.info(`[Altrium] API base: ${resolved}`);
+  } catch (err) {
+    /* no console — ignore */
+  }
+  return resolved;
+}
+
+function pickRawApiBase() {
   // 1 & 2: explicit override
   try {
     if (typeof window !== 'undefined') {
       if (window.__ALTRIUM_API_BASE__) {
-        return trimTrailingSlash(String(window.__ALTRIUM_API_BASE__));
+        return String(window.__ALTRIUM_API_BASE__);
       }
-      const fromQuery = new URLSearchParams(window.location.search).get('apiBase');
-      if (fromQuery) {
-        window.localStorage.setItem('altrium.apiBase', fromQuery);
-        return trimTrailingSlash(fromQuery);
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('apiBase')) {
+        const fromQuery = params.get('apiBase').trim();
+        // An empty / "reset" / "default" value forgets a stuck override.
+        if (!fromQuery || /^(reset|default)$/i.test(fromQuery)) {
+          window.localStorage.removeItem('altrium.apiBase');
+        } else {
+          window.localStorage.setItem('altrium.apiBase', fromQuery);
+          return fromQuery;
+        }
       }
       const stored = window.localStorage.getItem('altrium.apiBase');
-      if (stored) return trimTrailingSlash(stored);
+      if (stored) return stored;
     }
   } catch (err) {
     /* localStorage can throw in privacy mode — fall through to the default */
@@ -50,6 +70,22 @@ function resolveApiBaseUrl() {
   }
 
   return 'http://localhost:5000/api';
+}
+
+// Trim trailing slashes and, if the URL has no path at all, add the `/api`
+// mount point — "http://host:5000" is a common mistake that otherwise 404s
+// every request as "Resource not found.".
+function normalizeApiBase(value) {
+  const trimmed = trimTrailingSlash(String(value || '').trim());
+  try {
+    const url = new URL(trimmed);
+    if (url.pathname === '' || url.pathname === '/') {
+      return `${trimTrailingSlash(url.origin)}/api`;
+    }
+  } catch (err) {
+    /* not an absolute URL — leave it as-is */
+  }
+  return trimmed;
 }
 
 function trimTrailingSlash(value) {

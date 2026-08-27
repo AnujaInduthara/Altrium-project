@@ -20,6 +20,34 @@ const STATUS_LABELS = {
   selected: 'Selected',
 };
 
+// PB-05 — AI screening is advisory. These are screening states, NOT hiring
+// outcomes; the applicant's own status stays "Submitted".
+const SCREENING_STATUS_LABELS = {
+  not_started: 'Not started',
+  pending: 'Queued',
+  processing: 'Processing…',
+  completed: 'Completed',
+  failed: 'Unavailable',
+};
+
+const RECOMMENDATION_LABELS = {
+  STRONG_MATCH: 'Strong match',
+  GOOD_MATCH: 'Good match',
+  PARTIAL_MATCH: 'Partial match',
+  WEAK_MATCH: 'Weak match',
+  INSUFFICIENT_INFORMATION: 'Insufficient information',
+};
+
+const SCREENING_ERROR_NOTES = {
+  CV_EXTRACTION_ERROR:
+    'The CV text could not be read (it may be a scanned image). The application is still available for manual review.',
+  AI_PROVIDER_ERROR: 'The AI service could not be reached. You can re-run screening.',
+  AI_TIMEOUT: 'AI screening timed out. You can re-run screening.',
+  INVALID_AI_RESPONSE: 'AI screening returned an unusable result. You can re-run screening.',
+  DEPENDENCY_MISSING: 'AI screening could not be completed for this application.',
+  UNKNOWN_ERROR: 'AI screening could not be completed. The application remains available for manual review.',
+};
+
 const shell = mountAppShell(document.getElementById('app'), {
   activeNav: 'applications',
   onSignOut: async () => {
@@ -109,7 +137,102 @@ function renderApplication(application) {
   const cvBtn = node.querySelector('[data-view-cv]');
   cvBtn.addEventListener('click', () => openCv(application.id, cvBtn));
 
+  renderScreening(node, application);
+
   return node;
+}
+
+// --- PB-05 screening summary -------------------------------------------
+
+function renderScreening(node, application) {
+  const wrap = node.querySelector('[data-screening]');
+  if (!wrap) return;
+  const screening = application.screening || { status: 'not_started' };
+  const status = String(screening.status || 'not_started');
+
+  wrap.hidden = false;
+
+  const statusEl = wrap.querySelector('[data-screening-status]');
+  statusEl.textContent = SCREENING_STATUS_LABELS[status] || status;
+  statusEl.classList.toggle('badge--published', status === 'completed');
+  statusEl.classList.toggle('badge--closed', status === 'failed');
+
+  const body = wrap.querySelector('[data-screening-body]');
+  const note = wrap.querySelector('[data-screening-note]');
+  const retryBtn = wrap.querySelector('[data-screening-retry]');
+  body.hidden = true;
+  note.hidden = true;
+  retryBtn.hidden = true;
+
+  if (status === 'completed') {
+    body.hidden = false;
+    wrap.querySelector('[data-screening-score]').textContent =
+      typeof screening.score === 'number' ? String(screening.score) : '—';
+    const recEl = wrap.querySelector('[data-screening-rec]');
+    recEl.textContent = RECOMMENDATION_LABELS[screening.recommendation] || screening.recommendation || '';
+
+    const rankEl = wrap.querySelector('[data-screening-rank]');
+    if (screening.ai_screening_rank) {
+      rankEl.hidden = false;
+      rankEl.textContent = `AI rank #${screening.ai_screening_rank}`;
+    } else {
+      rankEl.hidden = true;
+    }
+
+    wrap.querySelector('[data-screening-summary]').textContent = screening.summary || '';
+    fillSkillList(wrap, '[data-screening-matched]', '[data-screening-matched-list]', screening.matched_skills);
+    fillSkillList(wrap, '[data-screening-missing]', '[data-screening-missing-list]', screening.missing_skills);
+  } else if (status === 'failed') {
+    note.hidden = false;
+    note.textContent =
+      SCREENING_ERROR_NOTES[screening.error_code] || SCREENING_ERROR_NOTES.UNKNOWN_ERROR;
+    retryBtn.hidden = false;
+    retryBtn.onclick = () => retryScreening(application.id, retryBtn);
+  } else if (status === 'pending' || status === 'processing') {
+    note.hidden = false;
+    note.textContent =
+      status === 'processing'
+        ? 'AI screening is currently being processed.'
+        : 'AI screening is waiting to be processed.';
+  }
+}
+
+function fillSkillList(wrap, groupSel, listSel, skills) {
+  const group = wrap.querySelector(groupSel);
+  const list = wrap.querySelector(listSel);
+  const items = Array.isArray(skills) ? skills.filter(Boolean) : [];
+  if (items.length === 0) {
+    group.hidden = true;
+    return;
+  }
+  group.hidden = false;
+  list.textContent = items.join(', ');
+}
+
+async function retryScreening(applicationId, button) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Re-running…';
+  try {
+    const { ok, status, body } = await ApplicationService.retryScreening(applicationId);
+    if (status === 401) {
+      await AuthService.signOut();
+      window.location.replace(LOGIN_PAGE);
+      return;
+    }
+    if (ok) {
+      alert.hide();
+      // Refresh the list so the new screening state shows.
+      await loadApplications(select.value);
+      return;
+    }
+    alert.error(body?.error?.message || 'Unable to re-run AI screening right now.');
+  } catch (err) {
+    alert.error('Unable to re-run AI screening. Please check your connection and try again.');
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
 }
 
 function renderList(applications) {

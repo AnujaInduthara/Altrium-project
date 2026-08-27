@@ -239,6 +239,26 @@ async function getApplicableVacancyByToken(token) {
   return { id: data.id, job_title: data.job_title };
 }
 
+// Internal, non-owner-checked lookup for the PB-05 screening pipeline. Returns
+// the job-relevant fields the screening prompt needs, or null if unknown. This
+// is only ever called server-side by the screening service (which is triggered
+// by the system, not by a user request), so there is no ownership check here.
+async function getVacancyForScreening(id) {
+  const { data, error } = await supabaseAdmin
+    .from('job_vacancies')
+    .select(
+      'id, job_title, department, location, employment_type, experience_level, job_description, job_requirements, status'
+    )
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '22P02') return null;
+    throw wrapDbError('Failed to load vacancy for screening', error);
+  }
+  return data || null;
+}
+
 module.exports = {
   createVacancy,
   listVacanciesForUser,
@@ -246,5 +266,6 @@ module.exports = {
   publishVacancy,
   getPublishedVacancyByToken,
   getApplicableVacancyByToken,
+  getVacancyForScreening,
   VacancyError,
 };

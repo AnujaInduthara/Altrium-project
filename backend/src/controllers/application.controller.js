@@ -1,6 +1,8 @@
 const { successResponse, errorResponse } = require('../utils/response');
 const vacancyService = require('../services/vacancy.service');
 const applicationService = require('../services/application.service');
+const screeningService = require('../services/screening/screeningService');
+const { toScreeningView } = require('./screening.controller');
 
 // A VacancyError (FORBIDDEN when the vacancy belongs to another HR user, etc.)
 // translates straight to a response; anything else is an unexpected failure.
@@ -21,7 +23,19 @@ async function listVacancyApplications(req, res) {
       return errorResponse(res, 404, 'VACANCY_NOT_FOUND', 'This vacancy could not be found.');
     }
 
-    const applications = await applicationService.listApplicationsForVacancy(vacancy.id);
+    const [applications, screenings] = await Promise.all([
+      applicationService.listApplicationsForVacancy(vacancy.id),
+      screeningService.listScreeningsForVacancy(vacancy.id),
+    ]);
+
+    // Attach each application's PB-05 screening summary (status / score /
+    // recommendation / rank) for the review list. The AI never changes the
+    // application's own status — that stays "submitted".
+    const byApplication = new Map(screenings.map((s) => [s.application_id, s]));
+    const withScreening = applications.map((application) => ({
+      ...application,
+      screening: toScreeningView(byApplication.get(application.id)),
+    }));
 
     return successResponse(res, {
       vacancy: {
@@ -31,7 +45,7 @@ async function listVacancyApplications(req, res) {
         location: vacancy.location,
         status: vacancy.status,
       },
-      applications,
+      applications: withScreening,
     });
   } catch (err) {
     return handleError(res, err, 'listVacancyApplications');

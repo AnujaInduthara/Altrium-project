@@ -1,0 +1,54 @@
+%PDF-1.4
+1 0 obj
+<</Type /Catalog /Pages 2 0 R>>
+endobj
+2 0 obj
+<</Type /Pages /Kids [3 0 R] /Count 1>>
+endobj
+3 0 obj
+<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <</Font <</F1 4 0 R>>>> /Contents 5 0 R>>
+endobj
+4 0 obj
+<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>
+endobj
+5 0 obj
+<</Length 955>>
+stream
+BT /F1 11 Tf 54 760 Td 14 TL
+(Jane Doe) Tj T*
+(Senior Software Engineer  |  Colombo, Sri Lanka) Tj T*
+(Email: jane.doe@example.com   Phone: +94 77 123 4567) Tj T*
+() Tj T*
+(PROFESSIONAL SUMMARY) Tj T*
+(Backend-focused software engineer with six years of experience designing) Tj T*
+(and operating web APIs. Comfortable across the stack with a bias toward) Tj T*
+(reliable, well-tested services.) Tj T*
+() Tj T*
+(SKILLS) Tj T*
+(Python, FastAPI, PostgreSQL, Git, REST, JavaScript, Linux, CI/CD) Tj T*
+() Tj T*
+(EXPERIENCE) Tj T*
+(Acme Corp - Senior Software Engineer \(2019 - 2025\)) Tj T*
+(Built and maintained FastAPI services backed by PostgreSQL. Owned the) Tj T*
+(CI pipeline and release process using Git and GitHub Actions.) Tj T*
+(Globex - Software Engineer \(2017 - 2019\)) Tj T*
+(Developed JavaScript front-end features and Python data pipelines.) Tj T*
+() Tj T*
+(EDUCATION) Tj T*
+(BSc in Computer Science, University of Colombo \(2017\)) Tj T*
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000056 00000 n 
+0000000111 00000 n 
+0000000231 00000 n 
+0000000299 00000 n 
+trailer
+<</Size 6 /Root 1 0 R>>
+startxref
+1303
+%%EOF
