@@ -1,6 +1,7 @@
 const express = require('express');
 const { authenticateUser, requireHR } = require('../middleware/auth.middleware');
 const vacancyController = require('../controllers/vacancy.controller');
+const applicationController = require('../controllers/application.controller');
 
 const router = express.Router();
 
@@ -11,5 +12,6 @@ router.post('/', vacancyController.createVacancy);
 router.get('/', vacancyController.listVacancies);
 router.get('/:id', vacancyController.getVacancy);
 router.post('/:id/publish', vacancyController.publishVacancy);
+router.get('/:id/applications', applicationController.listVacancyApplications);
 
 module.exports = router;

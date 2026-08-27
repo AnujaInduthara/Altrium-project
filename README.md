@@ -220,10 +220,8 @@ The token is in the URL **hash**, not the query string, so it survives the
 links (`vacancy.html#id=…`) use the hash for the same reason; `readParam()` in
 `js/utils/urlParams.js` reads either.
 
-`frontend/apply.html` is a minimal public page (no sign-in, no app shell) that
-resolves the token and shows the role. **PB-03** will add the actual
-application form and CV upload here — for now it shows the vacancy plus an
-"applications open soon" notice.
+`frontend/apply.html` is a public page (no sign-in, no app shell) that resolves
+the token, shows the vacancy, and hosts the PB-03 application form.
 
 ### Running it
 
@@ -231,6 +229,149 @@ application form and CV upload here — for now it shows the vacancy plus an
 2. Restart the backend, serve `frontend/`.
 3. Log in, open **Vacancies**, click a draft, **Publish Vacancy**, confirm.
    Copy the public link; open it in any browser (no login) to see the vacancy.
+
+## PB-03: Applicant Submits a CV Application
+
+An **external applicant** — no account, no login — opens a published vacancy's
+public link (`apply.html#token=<public_token>`), reviews the role, fills a short
+form, uploads a CV (PDF or DOCX) and submits. The application is stored with
+status `submitted`. AI screening (PB-05) and HR review (PB-06) are **not** part
+of this step.
+
+> **Migration required:** run `backend/sql/004_create_applications.sql` in the
+> Supabase SQL editor (after `003`). It creates `public.applications` and the
+> **private** `candidate-cvs` storage bucket.
+
+### Flow
+
+```
+apply.html#token=<public_token>
+      |  GET /api/public/vacancies/:token   -> published vacancy (public fields only)
+      v
+Applicant fills the form + attaches a CV
+      |  client validation (js/utils/applicantValidators.js)
+      v
+POST /api/public/vacancies/:token/applications   (multipart/form-data, no auth)
+      |
+      v
+rate limit -> parse CV (multer, memory) -> confirm vacancy is PUBLISHED
+      -> validate fields -> verify CV bytes (magic number, not just MIME)
+      -> recent-duplicate check -> upload CV to private bucket
+      -> insert applications row  (delete the CV if the insert fails)
+      v
+201 { success: true, data: { reference: "APP-XXXXXXXX", job_title, status: "submitted" } }
+      -> success screen with the application reference
+```
+
+### Database (migration `004`)
+
+`public.applications`:
+
+| column | type | notes |
+|---|---|---|
+| `id` | uuid | PK, `gen_random_uuid()` — **never exposed** |
+| `vacancy_id` | uuid | not null, FK -> `job_vacancies(id)` |
+| `reference` | text | not null, **unique** — public-facing `APP-XXXXXXXX` shown to the applicant |
+| `full_name` / `email` / `phone` / `location` | text | not null, non-blank; email is lower-cased, whitespace collapsed |
+| `cv_path` | text | not null — object key inside the private `candidate-cvs` bucket |
+| `cv_original_name` / `cv_size_bytes` / `cv_content_type` | | retained for later HR review |
+| `status` | text | not null, default `submitted`; check allows the later PB-06/07 values |
+| `created_at` / `updated_at` | timestamptz | `now()`; `updated_at` via the shared trigger |
+
+Indexes on `vacancy_id`, `lower(email)`, `(vacancy_id, lower(email))`,
+`created_at desc`. **RLS is enabled with no policies** — exactly like
+`job_vacancies`, all access is backend-only via the service-role key. A leaked
+anon/authenticated key cannot read applicant PII or CVs.
+
+### Storage
+
+Private bucket **`candidate-cvs`** (`public = false`), 5 MiB limit,
+`application/pdf` + `.docx` MIME types only, **no** `storage.objects` policies —
+so anon/authenticated cannot list, read or upload. CVs are written by the
+backend to `applications/<vacancy-id>/<uuid>.<ext>` (the applicant's filename is
+never used as a key). Reading a CV later (PB-06) will go through the backend or
+a short-lived signed URL.
+
+### API
+
+**`GET /api/public/vacancies/:token`** — unchanged from PB-02 (public fields
+only; `404` for draft/closed/unknown).
+
+**`POST /api/public/vacancies/:token/applications`** — **unauthenticated**,
+`multipart/form-data` with `full_name`, `email`, `phone`, `location` and a `cv`
+file.
+
+| status | when |
+|---|---|
+| `201` | created — `{ success: true, data: { reference, job_title, status: "submitted" } }` |
+| `400` | field validation — `{ error: { code: "VALIDATION_ERROR", message, fields } }`, or a missing/unreadable CV |
+| `404` | token unknown, or the vacancy is not `published` |
+| `409` | `DUPLICATE_APPLICATION` — same email already applied to this vacancy in the last 10 minutes |
+| `413` | `CV_TOO_LARGE` |
+| `415` | `CV_UNSUPPORTED_TYPE` — not a real PDF / DOCX |
+| `429` | per-IP rate limit (8 submissions / 10 min; 60 lookups / min) |
+| `500` | unexpected — generic message only, details logged server-side |
+
+### Validation & file security
+
+- Both sides validate. The **backend is authoritative**: it re-trims/normalizes
+  every field and never trusts the browser's MIME type, extension or filename.
+- The CV is verified by **magic bytes** (`%PDF-` for PDF; ZIP header +
+  `[Content_Types].xml` for DOCX), not just its claimed type.
+- Storage key is a server-generated UUID path — no path traversal, no
+  collisions, no malicious filenames.
+- CV upload + row insert are not one transaction; if the insert fails the
+  backend deletes the just-uploaded CV (best-effort compensation, logged).
+
+### Env
+
+Optional: `CV_MAX_BYTES` (bytes) overrides the 5 MiB CV size limit. Keep it in
+sync with the bucket's `file_size_limit` and `frontend/js/config.js`
+(`MAX_CV_MB`). No new secrets.
+
+### Tests
+
+`cd backend && npm test` runs `backend/test/applicationValidation.test.js`
+(Node's built-in test runner) — field validation and CV magic-byte checks.
+
+## PB-04 (partial): HR reviews applications
+
+An HR user opens **Applications** in the sidebar, picks one of their vacancies,
+and sees the CV applications submitted to it — applicant name, email, phone,
+location, submission date and reference — with a **View CV** action. AI
+screening, status changes and candidate selection are still later backlog items;
+this is only the review list + CV access.
+
+### Flow
+
+```
+Applications (applications.html)  — or  Vacancy details -> "View applications"
+      |  pick a vacancy
+      v
+GET /api/vacancies/:id/applications      Authorization: Bearer <access_token>
+      |  authenticateUser -> requireHR -> getVacancyForUser (owner check)
+      v
+{ vacancy: {...}, applications: [ { reference, full_name, email, phone,
+  location, status, cv_original_name, cv_size_bytes, cv_content_type,
+  created_at }, ... ] }        (never cv_path)
+      |
+      |  "View CV"
+      v
+GET /api/applications/:id/cv             Authorization: Bearer <access_token>
+      |  owner-checked via the parent vacancy
+      v
+{ url: "<signed URL, 120s>", file_name, content_type }   -> opened in a new tab
+```
+
+### API
+
+| endpoint | notes |
+|---|---|
+| `GET /api/vacancies/:id/applications` | HR only; `403` if the vacancy belongs to another HR user, `404` if unknown. Returns public-safe applicant fields only. |
+| `GET /api/applications/:id/cv` | HR only; `404` (not `403`) if the application belongs to another HR user's vacancy, so nothing leaks. Returns a **short-lived signed URL** (120s) into the private `candidate-cvs` bucket — the CV is never served through a public URL or a raw storage key. |
+
+No schema or storage changes — this reads the `applications` table and bucket
+created by migration `004`.
 
 ## Project structure
 
@@ -248,16 +389,20 @@ cd backend
 npm install
 ```
 
-Copy `backend/.env` and fill in:
+Copy `backend/.env.example` to `backend/.env` and fill in the Supabase values.
+The rest are optional:
 
 | Variable                    | Where to find it                                      |
 |------------------------------|--------------------------------------------------------|
 | `PORT`                       | Any free port, default `5000`                          |
-| `FRONTEND_URL`                | Origin of your local static server, e.g. `http://127.0.0.1:5500` |
-| `APP_URL`                     | Public base URL for the application link; usually same as `FRONTEND_URL`. Defaults to `FRONTEND_URL` if unset |
-| `SUPABASE_URL`                | Supabase Dashboard > Project Settings > API             |
-| `SUPABASE_ANON_KEY`           | Supabase Dashboard > Project Settings > API             |
-| `SUPABASE_SERVICE_ROLE_KEY`   | Supabase Dashboard > Project Settings > API (**server-only, never commit**) |
+| `SUPABASE_URL`               | Supabase Dashboard > Project Settings > API             |
+| `SUPABASE_ANON_KEY`          | Supabase Dashboard > Project Settings > API             |
+| `SUPABASE_SERVICE_ROLE_KEY`  | Supabase Dashboard > Project Settings > API (**server-only, never commit**) |
+| `FRONTEND_URL`               | *(optional)* frontend origin; localhost + private-LAN origins are allowed automatically |
+| `CORS_ORIGINS`               | *(optional)* extra allowed browser origins, comma-separated (e.g. a deployed URL) |
+| `CORS_ALLOW_ANY`             | *(optional)* `true` reflects every origin — only behind a trusted proxy |
+| `APP_URL`                    | *(optional)* fallback base URL for the application link when a request has no `Origin` header |
+| `CV_MAX_BYTES`               | *(optional)* max CV upload size in bytes; defaults to `5242880` (5 MiB)     |
 
 Run:
 
@@ -272,6 +417,7 @@ In the Supabase SQL editor, run the migrations in order:
 1. [`backend/sql/001_create_profiles.sql`](backend/sql/001_create_profiles.sql) — `profiles` table (links `auth.users` to an HR role), RLS self-read only.
 2. [`backend/sql/002_create_job_vacancies.sql`](backend/sql/002_create_job_vacancies.sql) — `job_vacancies` table (PB-01).
 3. [`backend/sql/003_add_vacancy_publishing.sql`](backend/sql/003_add_vacancy_publishing.sql) — `public_token` + `published_at` (PB-02).
+4. [`backend/sql/004_create_applications.sql`](backend/sql/004_create_applications.sql) — `applications` table + private `candidate-cvs` storage bucket (PB-03).
 
 There is no self-service HR sign-up. To create your first HR user:
 
@@ -285,27 +431,40 @@ There is no self-service HR sign-up. To create your first HR user:
 ### 3. Frontend
 
 `frontend/js/config.js` holds the public (browser-safe) Supabase URL and anon
-key — fill in the same two values from the table above:
+key — fill in the same two values from the table above. You do **not** need to
+set an API URL: the frontend calls the backend on **the same host that served
+the page, port 5000**, so it works from `localhost`, `127.0.0.1` or the
+machine's LAN IP with no edits.
 
-```js
-export const APP_CONFIG = {
-  SUPABASE_URL: 'YOUR_SUPABASE_PROJECT_URL',
-  SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY',
-  API_BASE_URL: 'http://localhost:5000/api',
-};
-```
-
-See [`frontend/README.md`](frontend/README.md) for the full folder layout and
-conventions.
-
-Serve the `frontend/` folder with any static file server, matching the port
-you set as `FRONTEND_URL` in the backend `.env`. For example:
+Serve the `frontend/` folder with any static file server. For example:
 
 ```
 npx serve frontend -l 5500
 ```
 
-or use the VS Code "Live Server" extension. Then open `http://127.0.0.1:5500/login.html`.
+or use the VS Code "Live Server" extension. Then open
+`http://localhost:5500/login.html` (or `http://<your-lan-ip>:5500/login.html`).
+
+See [`frontend/README.md`](frontend/README.md) for the full folder layout and
+conventions.
+
+### Runs on any laptop
+
+There is nothing machine-specific to change:
+
+- **CORS** — the backend allows `localhost`, `127.0.0.1` and private-LAN origins
+  (`192.168.x.x`, `10.x.x.x`, `172.16–31.x.x`) on any port automatically
+  (`backend/src/config/cors.js`). Set `CORS_ORIGINS` (comma-separated) only to
+  add a non-local origin such as a deployed URL.
+- **API URL** — resolved from `window.location` at runtime. Override with
+  `?apiBase=http://host:5000/api` in the URL (remembered afterwards) or
+  `window.__ALTRIUM_API_BASE__` if the backend runs on a different host/port.
+- **Public application link** — built from the HR user's own browser origin, so
+  the copied `apply.html#token=…` link points at the host they are using.
+
+> **Getting a CORS error?** Restart the backend after editing `backend/.env`,
+> and make sure the API request and the page use hosts that resolve to the same
+> machine (both `localhost`, or both the LAN IP — not one of each).
 
 ## Security notes
 
@@ -313,15 +472,19 @@ or use the VS Code "Live Server" extension. Then open `http://127.0.0.1:5500/log
 - Passwords are handled entirely by Supabase Auth; nothing here stores or hashes passwords.
 - HR authorization is decided server-side by looking up `profiles.role`, not from anything the client sends.
 - `profiles` and `job_vacancies` have RLS enabled with per-owner policies; there is no anon policy on either.
+- `applications` has RLS enabled with **no** policies; CVs live in a **private** bucket. Applicant PII and CVs are backend-only.
 - The `DRAFT -> PUBLISHED` transition and the `public_token` are set only by the backend; a request body cannot influence them.
 - The public application link contains only the random token — no internal id, no HR identity.
+- Applicant submissions never touch Supabase directly; the browser only talks to the backend, which validates everything (including the CV bytes).
 - Backend error responses never include stack traces, SQL errors, or Supabase internals.
+- CORS reflects an origin only if it is explicitly configured or is a localhost / private-LAN address; public internet origins are rejected unless added to `CORS_ORIGINS`.
 
 ## Remaining Sprint 1 work
 
 Done: Step 0 (HR Login), PB-01 (Create Job Vacancy — draft), PB-02 (Publish
-Vacancy — public link generated).
+Vacancy — public link generated), PB-03 (Applicant submits a CV application),
+PB-04 partial (HR reviews the application list + opens CVs).
 
-Not yet implemented: PB-03 applicant CV submission, PB-04 application storage,
-PB-05 AI CV screening, PB-06 applicant review, PB-07 candidate selection,
-PB-08 vacancy closing.
+Not yet implemented: PB-05 AI CV screening, PB-06 AI-filtered applicant review,
+PB-07 candidate selection, PB-08 vacancy closing. Application `status` stays
+`submitted` — no transitions yet.

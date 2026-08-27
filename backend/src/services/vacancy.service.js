@@ -216,11 +216,35 @@ async function getPublishedVacancyByToken(token) {
   return publicView;
 }
 
+// Public, unauthenticated lookup used by the PB-03 application submission. Like
+// getPublishedVacancyByToken it only ever resolves a PUBLISHED vacancy, but it
+// returns the internal `id` and `job_title` for the backend's own use (linking
+// the application row, wording the confirmation) — this shape is never sent to
+// the applicant's browser. Returns null for draft / closed / unknown tokens.
+async function getApplicableVacancyByToken(token) {
+  if (!token || typeof token !== 'string') return null;
+
+  const { data, error } = await supabaseAdmin
+    .from('job_vacancies')
+    .select('id, job_title, status')
+    .eq('public_token', token)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '22P02') return null;
+    throw wrapDbError('Failed to load vacancy for application', error);
+  }
+  if (!data || data.status !== VACANCY_STATUS.PUBLISHED) return null;
+
+  return { id: data.id, job_title: data.job_title };
+}
+
 module.exports = {
   createVacancy,
   listVacanciesForUser,
   getVacancyForUser,
   publishVacancy,
   getPublishedVacancyByToken,
+  getApplicableVacancyByToken,
   VacancyError,
 };

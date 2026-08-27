@@ -6,7 +6,7 @@ import { VacancyService } from '../services/vacancyService.js';
 import { mountAppShell } from '../components/AppShell.js';
 import { createAlert } from '../components/Alert.js';
 import { createModal } from '../components/Modal.js';
-import { readParam } from '../utils/urlParams.js';
+import { readParam, withHashParam } from '../utils/urlParams.js';
 
 const LOGIN_PAGE = 'login.html';
 
@@ -89,6 +89,7 @@ function render(vacancy) {
       'published-at-hint',
       vacancy.published_at ? `Published ${formatDateTime(vacancy.published_at)}` : ''
     );
+    $('view-applications-link').href = withHashParam('applications.html', 'vacancy', vacancy.id);
   }
 
   $('publish-modal-body').textContent = `Are you sure you want to publish “${vacancy.job_title}”?`;
