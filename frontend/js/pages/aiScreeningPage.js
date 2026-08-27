@@ -1,6 +1,6 @@
 // AI Screening page controller: mounts the app shell, enforces the HR-only
 // route, lets the HR user pick one of their vacancies and shows every applicant
-// ranked by their AI CV-match score.
+// in a results table ranked by their AI CV-match score.
 //
 // PB-05 — AI screening is advisory. The score / recommendation / rank never
 // change the applicant's own status and are never a hiring decision. Screening
@@ -16,20 +16,12 @@ import { readParam, withHashParam } from '../utils/urlParams.js';
 
 const LOGIN_PAGE = 'login.html';
 
-const SCREENING_STATUS_LABELS = {
-  not_started: 'Not started',
+// Short chip text for a screening that has not produced a score yet.
+const SCREENING_CHIP_LABELS = {
+  not_started: 'Not screened',
   pending: 'Queued',
   processing: 'Processing…',
-  completed: 'Completed',
   failed: 'Unavailable',
-};
-
-const RECOMMENDATION_LABELS = {
-  STRONG_MATCH: 'Strong match',
-  GOOD_MATCH: 'Good match',
-  PARTIAL_MATCH: 'Partial match',
-  WEAK_MATCH: 'Weak match',
-  INSUFFICIENT_INFORMATION: 'Insufficient information',
 };
 
 const MATCH_LABELS = {
@@ -37,8 +29,17 @@ const MATCH_LABELS = {
   MODERATE: 'Moderate',
   WEAK: 'Weak',
   NOT_APPLICABLE: 'Not applicable',
-  NOT_DEMONSTRATED: 'Not demonstrated',
-  INSUFFICIENT_INFORMATION: 'Insufficient info',
+  NOT_DEMONSTRATED: 'Not shown',
+  INSUFFICIENT_INFORMATION: 'Not shown',
+};
+
+// Applicant status (owned by HR, never by the AI) -> badge label + colour.
+const APP_STATUS = {
+  submitted: { label: 'New', cls: 'badge--neutral' },
+  under_review: { label: 'Review', cls: 'badge--warning' },
+  shortlisted: { label: 'Shortlisted', cls: 'badge--success' },
+  selected: { label: 'Selected', cls: 'badge--success' },
+  rejected: { label: 'Rejected', cls: 'badge--danger' },
 };
 
 const SCREENING_ERROR_NOTES = {
@@ -71,19 +72,27 @@ const $ = (id) => document.getElementById(id);
 const page = $('screening-page');
 const alert = createAlert($('screening-alert'));
 const select = $('vacancy-select');
+const statusFilter = $('status-filter');
+const searchInput = $('candidate-search');
 const runBtn = $('screening-run');
 const summaryEl = $('screening-summary');
 const vacancyEl = $('screening-vacancy');
-const footNoteEl = $('screening-foot-note');
 const loadingEl = $('screening-loading');
 const promptEl = $('screening-prompt');
 const emptyEl = $('screening-empty');
-const listEl = $('screening-list');
-const cardTemplate = $('screening-card-template');
+const noMatchEl = $('screening-no-match');
+const resultsEl = $('screening-results');
+const tbodyEl = $('screening-tbody');
+const rowTemplate = $('screening-row-template');
 
 let loadToken = 0;
 let refreshTimer = null;
 let refreshCount = 0;
+
+// The full, unfiltered application list for the selected vacancy, plus the
+// completed-only ranking. Filter / search re-render from these without a fetch.
+let currentApplications = [];
+let rankByApplication = new Map();
 
 // --- helpers -------------------------------------------------------------
 
@@ -91,13 +100,12 @@ function setView(view) {
   loadingEl.hidden = view !== 'loading';
   promptEl.hidden = view !== 'prompt';
   emptyEl.hidden = view !== 'empty';
-  listEl.hidden = view !== 'list';
-  summaryEl.hidden = view !== 'list';
-  footNoteEl.hidden = view !== 'list';
-  // The vacancy sub-header is useful for both the populated list and the
-  // "no applications yet" empty state.
-  vacancyEl.hidden = view !== 'list' && view !== 'empty';
-  if (view !== 'list') {
+  noMatchEl.hidden = view !== 'nomatch';
+  resultsEl.hidden = view !== 'results';
+  summaryEl.hidden = view !== 'results';
+  // The vacancy sub-header stays useful once a vacancy is chosen.
+  vacancyEl.hidden = !(view === 'results' || view === 'empty' || view === 'nomatch');
+  if (view !== 'results' && view !== 'nomatch') {
     runBtn.hidden = true;
     stopAutoRefresh();
   }
@@ -137,6 +145,10 @@ function statusKey(application) {
   return String(screeningOf(application).status || 'not_started');
 }
 
+function candidateName(application) {
+  return screeningOf(application).candidate_name || application.full_name || 'Applicant';
+}
+
 function sortApplications(applications) {
   return [...applications].sort((a, b) => {
     const sa = screeningOf(a);
@@ -149,7 +161,7 @@ function sortApplications(applications) {
       const scoreB = typeof sb.score === 'number' ? sb.score : -1;
       if (scoreA !== scoreB) return scoreB - scoreA;
     }
-    return String(a.full_name || '').localeCompare(String(b.full_name || ''));
+    return candidateName(a).localeCompare(candidateName(b));
   });
 }
 
@@ -160,6 +172,57 @@ function summarize(applications) {
     if (key in counts) counts[key] += 1;
   }
   return counts;
+}
+
+function computeRanks(applications) {
+  const map = new Map();
+  const completed = sortApplications(
+    applications.filter((a) => statusKey(a) === 'completed')
+  );
+  completed.forEach((application, index) => map.set(application.id, index + 1));
+  return map;
+}
+
+// "Skills Match" qualitative label — derived from the matched vs missing skill
+// evidence, falling back to the advisory recommendation when no skill lists are
+// present.
+function skillsMatch(screening) {
+  const count = (list) => (Array.isArray(list) ? list.filter(Boolean).length : 0);
+  const matched = count(screening.matched_skills);
+  const missing = count(screening.missing_skills);
+  const total = matched + missing;
+
+  let ratio;
+  if (total > 0) {
+    ratio = matched / total;
+  } else {
+    const byRec = {
+      STRONG_MATCH: 0.95,
+      GOOD_MATCH: 0.75,
+      PARTIAL_MATCH: 0.5,
+      WEAK_MATCH: 0.25,
+    };
+    ratio = byRec[screening.recommendation];
+    if (ratio == null) return { label: '—', band: 'none' };
+  }
+
+  if (ratio >= 0.85) return { label: 'Excellent', band: 'excellent' };
+  if (ratio >= 0.65) return { label: 'Very Good', band: 'good' };
+  if (ratio >= 0.4) return { label: 'Good', band: 'ok' };
+  return { label: 'Average', band: 'low' };
+}
+
+function scoreBand(score) {
+  if (score >= 70) return 'high';
+  if (score >= 50) return 'mid';
+  return 'low';
+}
+
+function reviewHref(applicationId) {
+  const vacancyId = select.value;
+  return vacancyId
+    ? `applicant-review.html#id=${encodeURIComponent(applicationId)}&vacancy=${encodeURIComponent(vacancyId)}`
+    : `applicant-review.html#id=${encodeURIComponent(applicationId)}`;
 }
 
 // --- rendering ----------------------------------------------------------
@@ -173,7 +236,6 @@ function renderSummary(counts, total, applications) {
   set('[data-summary-total]', `${total} applicant${total === 1 ? '' : 's'}`);
   set('[data-summary-completed]', `${counts.completed} screened`);
 
-  // Average / top AI score across the completed screenings only.
   const scores = applications
     .map((a) => screeningOf(a))
     .filter((s) => s.status === 'completed' && typeof s.score === 'number')
@@ -191,126 +253,107 @@ function renderSummary(counts, total, applications) {
   const running = counts.processing + counts.pending;
   set('[data-summary-running]', `${running} in progress`, running > 0);
   set('[data-summary-failed]', `${counts.failed} unavailable`, counts.failed > 0);
-  const notRun = counts.not_started;
-  set('[data-summary-pending]', `${notRun} not started`, notRun > 0);
+  set('[data-summary-pending]', `${counts.not_started} not started`, counts.not_started > 0);
 }
 
-function fillSkillList(wrap, groupSel, listSel, skills) {
-  const group = wrap.querySelector(groupSel);
-  const items = Array.isArray(skills) ? skills.filter(Boolean) : [];
-  if (items.length === 0) {
-    group.hidden = true;
-    return;
-  }
-  group.hidden = false;
-  wrap.querySelector(listSel).textContent = items.join(', ');
-}
-
-function renderCard(application, rank) {
-  const node = cardTemplate.content.firstElementChild.cloneNode(true);
+function buildRow(application) {
+  const node = rowTemplate.content.firstElementChild.cloneNode(true);
   const screening = screeningOf(application);
-  const status = String(screening.status || 'not_started');
+  const status = statusKey(application);
+  const href = reviewHref(application.id);
+  const name = candidateName(application);
 
-  node.querySelector('[data-name]').textContent =
-    screening.candidate_name || application.full_name || 'Applicant';
+  const nameEl = node.querySelector('[data-name]');
+  nameEl.textContent = name;
+  nameEl.href = href;
+  node.querySelector('[data-ref]').textContent = application.reference || '';
 
-  const statusEl = node.querySelector('[data-status]');
-  statusEl.textContent = SCREENING_STATUS_LABELS[status] || status;
-  statusEl.classList.toggle('badge--published', status === 'completed');
-  statusEl.classList.toggle('badge--closed', status === 'failed');
+  // Whole row navigates to the read-only review, except clicks on the Re-run
+  // control (or the name link, which navigates on its own).
+  node.addEventListener('click', (event) => {
+    if (event.target.closest('a') || event.target.closest('[data-rerun]')) return;
+    window.location.assign(href);
+  });
 
-  const rankEl = node.querySelector('[data-rank]');
-  if (status === 'completed' && rank) {
-    rankEl.textContent = `#${rank}`;
-  } else {
-    rankEl.textContent = '';
-    rankEl.classList.add('screening-card__rank--empty');
-  }
-
-  const scoreline = node.querySelector('[data-scoreline]');
-  const meter = node.querySelector('[data-meter]');
-  const matches = node.querySelector('[data-matches]');
-  const summary = node.querySelector('[data-summary]');
-  const note = node.querySelector('[data-note]');
+  const scoreCell = node.querySelector('[data-score-cell]');
+  const chip = node.querySelector('[data-score-chip]');
   const rerunBtn = node.querySelector('[data-rerun]');
 
-  if (status === 'completed') {
-    scoreline.hidden = false;
-    const score = typeof screening.score === 'number' ? screening.score : null;
-    node.querySelector('[data-score]').textContent = score == null ? '—' : String(score);
-    node.querySelector('[data-rec]').textContent =
-      RECOMMENDATION_LABELS[screening.recommendation] || screening.recommendation || '';
-
-    if (score != null) {
-      meter.hidden = false;
-      const fill = node.querySelector('[data-meter-fill]');
-      fill.style.width = `${Math.max(0, Math.min(100, score))}%`;
-      fill.dataset.band = score >= 70 ? 'high' : score >= 50 ? 'mid' : 'low';
-    }
-
-    const exp = MATCH_LABELS[screening.experience_match];
-    const edu = MATCH_LABELS[screening.education_match];
-    if (exp || edu) {
-      matches.hidden = false;
-      node.querySelector('[data-exp]').textContent = exp ? `Experience: ${exp}` : '';
-      node.querySelector('[data-edu]').textContent = edu ? `Education: ${edu}` : '';
-    }
-
-    if (screening.summary) {
-      summary.hidden = false;
-      summary.textContent = screening.summary;
-    }
-    fillSkillList(node, '[data-matched-wrap]', '[data-matched]', screening.matched_skills);
-    fillSkillList(node, '[data-missing-wrap]', '[data-missing]', screening.missing_skills);
-
-    rerunBtn.hidden = false;
-    rerunBtn.textContent = 'Re-run';
-  } else if (status === 'failed') {
-    note.hidden = false;
-    note.textContent = SCREENING_ERROR_NOTES[screening.error_code] || SCREENING_ERROR_NOTES.UNKNOWN_ERROR;
-    rerunBtn.hidden = false;
-    rerunBtn.textContent = 'Re-run';
-  } else if (status === 'processing' || status === 'pending') {
-    note.hidden = false;
-    note.textContent =
-      status === 'processing'
-        ? 'AI screening is currently being processed.'
-        : 'AI screening is queued.';
+  if (status === 'completed' && typeof screening.score === 'number') {
+    const score = Math.max(0, Math.min(100, screening.score));
+    scoreCell.hidden = false;
+    node.querySelector('[data-score]').textContent = `${score}%`;
+    const fill = node.querySelector('[data-fill]');
+    fill.style.width = `${score}%`;
+    fill.dataset.band = scoreBand(score);
   } else {
-    note.hidden = false;
-    note.textContent = 'AI screening has not run for this application yet.';
-    rerunBtn.hidden = false;
-    rerunBtn.textContent = 'Run screening';
+    chip.hidden = false;
+    chip.textContent = SCREENING_CHIP_LABELS[status] || 'Not screened';
+    chip.classList.toggle('screening-chip--warn', status === 'failed');
+
+    if (status === 'failed' || status === 'not_started' || status === 'pending') {
+      rerunBtn.hidden = false;
+      rerunBtn.textContent = status === 'failed' ? 'Re-run' : 'Run now';
+      rerunBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        rerunOne(application.id, rerunBtn);
+      });
+      if (status === 'failed' && screening.error_code) {
+        rerunBtn.title = SCREENING_ERROR_NOTES[screening.error_code] || SCREENING_ERROR_NOTES.UNKNOWN_ERROR;
+      }
+    }
   }
 
-  const viewLink = node.querySelector('[data-view]');
-  const vacancyId = select.value;
-  viewLink.href = vacancyId
-    ? `applicant-review.html#id=${encodeURIComponent(application.id)}&vacancy=${encodeURIComponent(vacancyId)}`
-    : `applicant-review.html#id=${encodeURIComponent(application.id)}`;
-  viewLink.setAttribute(
-    'aria-label',
-    `Review ${screening.candidate_name || application.full_name || 'applicant'}`
-  );
-
-  const cvBtn = node.querySelector('[data-view-cv]');
-  cvBtn.addEventListener('click', () => openCv(application.id, cvBtn));
-  if (!rerunBtn.hidden) {
-    rerunBtn.addEventListener('click', () => rerunOne(application.id, rerunBtn));
+  const skills = node.querySelector('[data-skills]');
+  if (status === 'completed') {
+    const sm = skillsMatch(screening);
+    skills.textContent = sm.label;
+    skills.dataset.band = sm.band;
   }
+
+  if (status === 'completed') {
+    node.querySelector('[data-exp]').textContent =
+      MATCH_LABELS[screening.experience_match] || '—';
+    node.querySelector('[data-edu]').textContent =
+      MATCH_LABELS[screening.education_match] || '—';
+  }
+
+  const rankEl = node.querySelector('[data-rank]');
+  const rank = rankByApplication.get(application.id);
+  if (rank) rankEl.textContent = String(rank);
+
+  const badge = node.querySelector('[data-status]');
+  const meta = APP_STATUS[application.status] || { label: application.status || 'New', cls: 'badge--neutral' };
+  badge.textContent = meta.label;
+  badge.classList.add(meta.cls);
 
   return node;
 }
 
-function renderList(applications) {
-  const sorted = sortApplications(applications);
-  let rank = 0;
-  const nodes = sorted.map((application) => {
-    const isCompleted = statusKey(application) === 'completed';
-    if (isCompleted) rank += 1;
-    return renderCard(application, isCompleted ? rank : null);
+function applyFilters() {
+  if (currentApplications.length === 0) return;
+
+  const wanted = statusFilter.value;
+  const query = searchInput.value.trim().toLowerCase();
+
+  const filtered = currentApplications.filter((application) => {
+    if (wanted !== 'all' && application.status !== wanted) return false;
+    if (query && !candidateName(application).toLowerCase().includes(query)) return false;
+    return true;
   });
-  listEl.replaceChildren(...nodes);
+
+  if (filtered.length === 0) {
+    setView('nomatch');
+    return;
+  }
+
+  tbodyEl.replaceChildren(...sortApplications(filtered).map(buildRow));
+  setView('results');
+}
+
+function renderList(applications) {
+  currentApplications = applications;
+  rankByApplication = computeRanks(applications);
 
   const counts = summarize(applications);
   renderSummary(counts, applications.length, applications);
@@ -318,7 +361,7 @@ function renderList(applications) {
   const hasRunnable = counts.pending + counts.failed + counts.not_started > 0;
   runBtn.hidden = !hasRunnable;
 
-  setView('list');
+  applyFilters();
 
   // Keep refreshing while anything is still in flight.
   if (counts.processing + counts.pending > 0) {
@@ -330,40 +373,6 @@ function renderList(applications) {
 }
 
 // --- actions ----------------------------------------------------------
-
-async function openCv(applicationId, button) {
-  const cvWindow = window.open('about:blank', '_blank');
-  if (cvWindow) {
-    try { cvWindow.opener = null; } catch (err) { /* cross-origin, ignore */ }
-  }
-  const label = button.querySelector('[data-cv-label]');
-  const original = label.textContent;
-  button.disabled = true;
-  label.textContent = 'Opening…';
-
-  try {
-    const { ok, status, body } = await ApplicationService.getCvLink(applicationId);
-    if (status === 401) {
-      if (cvWindow) cvWindow.close();
-      await AuthService.signOut();
-      window.location.replace(LOGIN_PAGE);
-      return;
-    }
-    if (ok && body?.data?.url) {
-      if (cvWindow) cvWindow.location = body.data.url;
-      else window.location.assign(body.data.url);
-    } else {
-      if (cvWindow) cvWindow.close();
-      alert.error(body?.error?.message || 'Unable to open this CV. Please try again.');
-    }
-  } catch (err) {
-    if (cvWindow) cvWindow.close();
-    alert.error('Unable to open this CV. Please check your connection and try again.');
-  } finally {
-    button.disabled = false;
-    label.textContent = original;
-  }
-}
 
 async function rerunOne(applicationId, button) {
   const original = button.textContent;
@@ -425,6 +434,7 @@ async function loadScreenings(vacancyId, { silent = false } = {}) {
   if (!silent) alert.hide();
 
   if (!vacancyId) {
+    currentApplications = [];
     setView('prompt');
     return;
   }
@@ -451,6 +461,7 @@ async function loadScreenings(vacancyId, { silent = false } = {}) {
     const applications = (body && body.data && body.data.applications) || [];
     renderVacancyHeader(body && body.data && body.data.vacancy);
     if (applications.length === 0) {
+      currentApplications = [];
       setView('empty');
     } else {
       renderList(applications);
@@ -531,6 +542,8 @@ select.addEventListener('change', () => {
   loadScreenings(id);
 });
 
+statusFilter.addEventListener('change', applyFilters);
+searchInput.addEventListener('input', applyFilters);
 runBtn.addEventListener('click', runPending);
 
 document.addEventListener('DOMContentLoaded', init);

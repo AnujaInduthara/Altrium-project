@@ -6,36 +6,18 @@
 .vacancy-form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-}
-
-.vacancy-form__section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  border: none;
-  padding: 0;
-  margin: 0;
-  min-width: 0;
-}
-
-.vacancy-form__legend {
-  padding: 0;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text-muted);
+  gap: var(--space-5);
 }
 
 .vacancy-form__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
+  gap: var(--space-5);
+  align-items: start;
 }
 
-.vacancy-form__positions {
-  max-width: 12rem;
+.field__req {
+  color: var(--color-danger);
 }
 
 .form-actions {
@@ -86,9 +68,5 @@
 
   .form-actions .button {
     width: 100%;
-  }
-
-  .vacancy-form__positions {
-    max-width: none;
   }
 }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Create New Vacancy — Altrium</title>
+  <title>Create Job Vacancy — Altrium</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -16,10 +16,10 @@
   <div id="app" data-active-nav="vacancies">
     <section class="page" id="vacancy-page" hidden>
       <header class="page-header">
-        <h1 class="page-header__title">Create New Vacancy</h1>
+        <h1 class="page-header__title">Create Job Vacancy</h1>
         <p class="page-header__subtitle">
-          Fill in the role details and save it as a draft. Drafts are private and
-          are not published or open to applicants yet.
+          Fill in the details to create a new job vacancy. It is saved as a draft
+          and stays private until you publish it.
         </p>
       </header>
 
@@ -28,11 +28,9 @@
         <form id="vacancy-form" class="vacancy-form" novalidate>
           <div class="alert" id="form-alert" role="alert" aria-live="assertive" hidden></div>
 
-          <fieldset class="vacancy-form__section">
-            <legend class="vacancy-form__legend">Basic information</legend>
-
+          <div class="vacancy-form__grid">
             <div class="field field--plain" data-field="job_title">
-              <label class="field__label" for="job_title">Job Title</label>
+              <label class="field__label" for="job_title">Job Title <span class="field__req">*</span></label>
               <div class="field__control">
                 <input
                   class="field__input"
@@ -41,99 +39,99 @@
                   name="job_title"
                   maxlength="150"
                   autocomplete="off"
-                  placeholder="e.g. Software Engineer"
+                  placeholder="Enter job title"
                   required
                 />
               </div>
               <p class="field__error" id="job_title-error" role="alert"></p>
             </div>
 
-            <div class="vacancy-form__grid">
-              <div class="field field--plain field--select" data-field="department">
-                <label class="field__label" for="department">Department</label>
-                <div class="field__control">
-                  <select class="field__input" id="department" name="department" required>
-                    <option value="">Select a department</option>
-                    <option value="Engineering">Engineering</option>
-                    <option value="Product">Product</option>
-                    <option value="Design">Design</option>
-                    <option value="Finance">Finance</option>
-                    <option value="Human Resources">Human Resources</option>
-                    <option value="Marketing">Marketing</option>
-                    <option value="Sales">Sales</option>
-                    <option value="Operations">Operations</option>
-                    <option value="Customer Support">Customer Support</option>
-                    <option value="Legal">Legal</option>
-                  </select>
-                  <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </div>
-                <p class="field__error" id="department-error" role="alert"></p>
+            <div class="field field--plain field--select" data-field="department">
+              <label class="field__label" for="department">Department <span class="field__req">*</span></label>
+              <div class="field__control">
+                <select class="field__input" id="department" name="department" required>
+                  <option value="">Select department</option>
+                  <option value="Engineering">Engineering</option>
+                  <option value="Product">Product</option>
+                  <option value="Design">Design</option>
+                  <option value="Finance">Finance</option>
+                  <option value="Human Resources">Human Resources</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Sales">Sales</option>
+                  <option value="Operations">Operations</option>
+                  <option value="Customer Support">Customer Support</option>
+                  <option value="Legal">Legal</option>
+                </select>
+                <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
               </div>
+              <p class="field__error" id="department-error" role="alert"></p>
+            </div>
+          </div>
 
-              <div class="field field--plain" data-field="location">
-                <label class="field__label" for="location">Location</label>
-                <div class="field__control">
-                  <input
-                    class="field__input"
-                    type="text"
-                    id="location"
-                    name="location"
-                    maxlength="120"
-                    autocomplete="off"
-                    placeholder="e.g. Colombo"
-                    required
-                  />
-                </div>
-                <p class="field__error" id="location-error" role="alert"></p>
+          <div class="vacancy-form__grid">
+            <div class="field field--plain field--select" data-field="employment_type">
+              <label class="field__label" for="employment_type">Employment Type <span class="field__req">*</span></label>
+              <div class="field__control">
+                <select class="field__input" id="employment_type" name="employment_type" required>
+                  <option value="">Select type</option>
+                  <option value="Full-time">Full-time</option>
+                  <option value="Part-time">Part-time</option>
+                  <option value="Contract">Contract</option>
+                  <option value="Internship">Internship</option>
+                  <option value="Temporary">Temporary</option>
+                </select>
+                <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
               </div>
+              <p class="field__error" id="employment_type-error" role="alert"></p>
             </div>
 
-            <div class="vacancy-form__grid">
-              <div class="field field--plain field--select" data-field="employment_type">
-                <label class="field__label" for="employment_type">Employment Type</label>
-                <div class="field__control">
-                  <select class="field__input" id="employment_type" name="employment_type" required>
-                    <option value="">Select a type</option>
-                    <option value="Full-time">Full-time</option>
-                    <option value="Part-time">Part-time</option>
-                    <option value="Contract">Contract</option>
-                    <option value="Internship">Internship</option>
-                    <option value="Temporary">Temporary</option>
-                  </select>
-                  <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </div>
-                <p class="field__error" id="employment_type-error" role="alert"></p>
+            <div class="field field--plain" data-field="location">
+              <label class="field__label" for="location">Location <span class="field__req">*</span></label>
+              <div class="field__control">
+                <input
+                  class="field__input"
+                  type="text"
+                  id="location"
+                  name="location"
+                  maxlength="120"
+                  autocomplete="off"
+                  placeholder="Enter location"
+                  required
+                />
               </div>
+              <p class="field__error" id="location-error" role="alert"></p>
+            </div>
+          </div>
 
-              <div class="field field--plain field--select" data-field="experience_level">
-                <label class="field__label" for="experience_level">Experience Level</label>
-                <div class="field__control">
-                  <select class="field__input" id="experience_level" name="experience_level" required>
-                    <option value="">Select a level</option>
-                    <option value="Entry Level">Entry Level</option>
-                    <option value="1+ Years">1+ Years</option>
-                    <option value="2+ Years">2+ Years</option>
-                    <option value="3+ Years">3+ Years</option>
-                    <option value="5+ Years">5+ Years</option>
-                    <option value="8+ Years">8+ Years</option>
-                  </select>
-                  <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </div>
-                <p class="field__error" id="experience_level-error" role="alert"></p>
+          <div class="vacancy-form__grid">
+            <div class="field field--plain field--select" data-field="experience_level">
+              <label class="field__label" for="experience_level">Experience Level <span class="field__req">*</span></label>
+              <div class="field__control">
+                <select class="field__input" id="experience_level" name="experience_level" required>
+                  <option value="">Select experience level</option>
+                  <option value="Entry Level">Entry Level</option>
+                  <option value="1+ Years">1+ Years</option>
+                  <option value="2+ Years">2+ Years</option>
+                  <option value="3+ Years">3+ Years</option>
+                  <option value="5+ Years">5+ Years</option>
+                  <option value="8+ Years">8+ Years</option>
+                </select>
+                <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
               </div>
+              <p class="field__error" id="experience_level-error" role="alert"></p>
             </div>
 
-            <div class="field field--plain vacancy-form__positions" data-field="number_of_positions">
-              <label class="field__label" for="number_of_positions">Number of Positions</label>
+            <div class="field field--plain" data-field="number_of_positions">
+              <label class="field__label" for="number_of_positions">No. of Positions <span class="field__req">*</span></label>
               <div class="field__control">
                 <input
                   class="field__input"
@@ -145,55 +143,52 @@
                   step="1"
                   inputmode="numeric"
                   value="1"
+                  placeholder="Enter number of positions"
                   required
                 />
               </div>
               <p class="field__error" id="number_of_positions-error" role="alert"></p>
             </div>
-          </fieldset>
+          </div>
 
-          <fieldset class="vacancy-form__section">
-            <legend class="vacancy-form__legend">Role details</legend>
-
-            <div class="field field--plain" data-field="job_description">
-              <label class="field__label" for="job_description">Job Description</label>
-              <div class="field__control">
-                <textarea
-                  class="field__input"
-                  id="job_description"
-                  name="job_description"
-                  rows="7"
-                  maxlength="10000"
-                  placeholder="Describe the role, responsibilities, team and what success looks like."
-                  required
-                ></textarea>
-              </div>
-              <p class="field__hint" id="job_description-count" aria-live="polite">0 / 10000</p>
-              <p class="field__error" id="job_description-error" role="alert"></p>
+          <div class="field field--plain" data-field="job_description">
+            <label class="field__label" for="job_description">Job Description <span class="field__req">*</span></label>
+            <div class="field__control">
+              <textarea
+                class="field__input"
+                id="job_description"
+                name="job_description"
+                rows="7"
+                maxlength="10000"
+                placeholder="Enter job description"
+                required
+              ></textarea>
             </div>
+            <p class="field__hint" id="job_description-count" aria-live="polite">0 / 10000</p>
+            <p class="field__error" id="job_description-error" role="alert"></p>
+          </div>
 
-            <div class="field field--plain" data-field="job_requirements">
-              <label class="field__label" for="job_requirements">Job Requirements</label>
-              <p class="field__hint" id="job_requirements-hint">One requirement per line.</p>
-              <div class="field__control">
-                <textarea
-                  class="field__input"
-                  id="job_requirements"
-                  name="job_requirements"
-                  rows="6"
-                  aria-describedby="job_requirements-hint"
-                  placeholder="Python&#10;FastAPI&#10;PostgreSQL&#10;Git&#10;JavaScript"
-                  required
-                ></textarea>
-              </div>
-              <p class="field__error" id="job_requirements-error" role="alert"></p>
+          <div class="field field--plain" data-field="job_requirements">
+            <label class="field__label" for="job_requirements">Job Requirements <span class="field__req">*</span></label>
+            <p class="field__hint" id="job_requirements-hint">One requirement per line.</p>
+            <div class="field__control">
+              <textarea
+                class="field__input"
+                id="job_requirements"
+                name="job_requirements"
+                rows="6"
+                aria-describedby="job_requirements-hint"
+                placeholder="Python&#10;FastAPI&#10;PostgreSQL&#10;Git&#10;JavaScript"
+                required
+              ></textarea>
             </div>
-          </fieldset>
+            <p class="field__error" id="job_requirements-error" role="alert"></p>
+          </div>
 
           <div class="form-actions">
             <a class="button button--ghost" href="vacancies.html" id="cancel-link">Cancel</a>
-            <button type="submit" id="save-draft-btn" class="button button--primary">
-              <span data-label>Save Draft</span>
+            <button type="submit" id="create-vacancy-btn" class="button button--primary">
+              <span data-label>Create Vacancy</span>
             </button>
           </div>
         </form>
@@ -206,22 +201,22 @@
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
           <path d="m9 11 3 3L22 4" />
         </svg>
-        <h2 class="heading-lg">Vacancy saved successfully</h2>
+        <h2 class="heading-lg">Vacancy created</h2>
         <p class="text-muted" id="vacancy-success-title"></p>
         <p class="vacancy-success__status">
           Status: <span class="badge badge--draft">Draft</span>
         </p>
         <p class="text-muted text-sm">
-          This vacancy is a draft. It has not been published and no application
-          link has been created yet.
+          The vacancy has been saved as a draft. Open it to review the details and
+          publish it when you are ready.
         </p>
         <div class="form-actions vacancy-success__actions">
           <button type="button" class="button button--ghost" id="create-another-btn">
             Create another
           </button>
-          <a class="button button--ghost" href="vacancies.html">Back to Job Vacancies</a>
+          <a class="button button--ghost" href="vacancies.html">Back to Vacancies</a>
           <a class="button button--primary" id="open-vacancy-link" href="vacancies.html">
-            Open vacancy
+            Review &amp; publish
           </a>
         </div>
       </div>

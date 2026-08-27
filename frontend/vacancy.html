@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vacancy Details — Altrium</title>
+  <title>Publish Job Vacancy — Altrium</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -15,7 +15,7 @@
 <body>
   <div id="app" data-active-nav="vacancies">
     <section class="page" id="vacancy-page" hidden>
-      <a class="back-link" href="vacancies.html">&larr; Back to Job Vacancies</a>
+      <a class="back-link" href="vacancies.html">&larr; Back to Vacancies</a>
 
       <p class="status-message" id="detail-loading">Loading vacancy…</p>
 
@@ -24,90 +24,115 @@
         <p class="text-muted" id="detail-error-message">
           It may have been removed, or you may not have permission to view it.
         </p>
-        <p><a class="button button--ghost" href="vacancies.html">Back to Job Vacancies</a></p>
+        <p><a class="button button--ghost" href="vacancies.html">Back to Vacancies</a></p>
       </div>
 
       <div id="vacancy-detail" hidden>
-        <header class="page-header vacancy-detail__header">
-          <div class="vacancy-detail__heading">
-            <div class="vacancy-detail__title-row">
-              <h1 class="page-header__title" id="detail-title"></h1>
-              <span class="badge" id="detail-status">Draft</span>
-            </div>
-            <p class="page-header__subtitle" id="detail-subtitle"></p>
-          </div>
-
-          <div class="vacancy-detail__actions">
-            <button type="button" class="button button--primary" id="publish-btn" hidden>
-              <span data-label>Publish Vacancy</span>
-            </button>
-          </div>
+        <header class="page-header">
+          <h1 class="page-header__title">Publish Job Vacancy</h1>
+          <p class="page-header__subtitle">
+            Review and publish the vacancy to generate a public application link.
+          </p>
         </header>
 
         <div class="alert" id="detail-alert" role="alert" aria-live="assertive" hidden></div>
 
-        <p class="vacancy-detail__note" id="draft-note" hidden>
-          This vacancy is a <strong>draft</strong>. Publish it to generate a public
-          application link and make it visible to applicants.
-        </p>
+        <div class="publish-layout">
+          <!-- Left: read-only vacancy details -->
+          <section class="card publish-details">
+            <div class="card__header">
+              <h2 class="card__title">Vacancy Details</h2>
+            </div>
+            <dl class="detail-list">
+              <div class="detail-list__row">
+                <dt>Job Title</dt><dd id="detail-title"></dd>
+              </div>
+              <div class="detail-list__row">
+                <dt>Department</dt><dd id="detail-department"></dd>
+              </div>
+              <div class="detail-list__row">
+                <dt>Employment Type</dt><dd id="detail-employment-type"></dd>
+              </div>
+              <div class="detail-list__row">
+                <dt>Location</dt><dd id="detail-location"></dd>
+              </div>
+              <div class="detail-list__row">
+                <dt>Experience Level</dt><dd id="detail-experience-level"></dd>
+              </div>
+              <div class="detail-list__row">
+                <dt>No. of Positions</dt><dd id="detail-positions"></dd>
+              </div>
+              <div class="detail-list__row">
+                <dt>Description</dt><dd id="detail-description" class="detail-list__prose"></dd>
+              </div>
+              <div class="detail-list__row">
+                <dt>Requirements</dt>
+                <dd><ul class="detail-requirements" id="detail-requirements"></ul></dd>
+              </div>
+            </dl>
+          </section>
 
-        <div class="card">
-          <dl class="detail-list">
-            <div class="detail-list__row">
-              <dt>Department</dt><dd id="detail-department"></dd>
+          <!-- Right: publish controls -->
+          <aside class="card publish-panel">
+            <div class="card__header">
+              <h2 class="card__title">Publish Vacancy</h2>
+              <p class="card__subtitle" id="publish-panel-subtitle">
+                Make this vacancy live for candidates to apply.
+              </p>
             </div>
-            <div class="detail-list__row">
-              <dt>Location</dt><dd id="detail-location"></dd>
-            </div>
-            <div class="detail-list__row">
-              <dt>Employment Type</dt><dd id="detail-employment-type"></dd>
-            </div>
-            <div class="detail-list__row">
-              <dt>Experience Level</dt><dd id="detail-experience-level"></dd>
-            </div>
-            <div class="detail-list__row">
-              <dt>Number of Positions</dt><dd id="detail-positions"></dd>
-            </div>
-            <div class="detail-list__row">
-              <dt>Job Description</dt><dd id="detail-description" class="detail-list__prose"></dd>
-            </div>
-            <div class="detail-list__row">
-              <dt>Job Requirements</dt>
-              <dd><ul class="detail-requirements" id="detail-requirements"></ul></dd>
-            </div>
-          </dl>
-        </div>
 
-        <!-- PUBLISHED: public link -->
-        <div class="card published-panel" id="published-panel" hidden>
-          <h2 class="heading-lg">
-            <span class="published-panel__check" aria-hidden="true">✓</span>
-            Job vacancy published
-          </h2>
-          <p class="text-muted text-sm">
-            Applicants can apply for this vacancy using the public link below. No
-            sign-in is required.
-          </p>
-          <label class="field__label" for="public-url">Public application link</label>
-          <div class="copy-row">
-            <input class="field__input" id="public-url" type="text" readonly />
-            <button type="button" class="button button--ghost" id="copy-btn">
-              <span data-label>Copy link</span>
+            <div class="publish-status">
+              <span class="publish-status__label">Status</span>
+              <div class="toggle-row">
+                <span class="toggle-row__side">Draft</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked="false"
+                  class="toggle"
+                  id="status-toggle"
+                  aria-label="Publish this vacancy"
+                >
+                  <span class="toggle__thumb" aria-hidden="true"></span>
+                </button>
+                <span class="toggle-row__side">Published</span>
+              </div>
+            </div>
+
+            <div class="publish-field">
+              <label class="field__label" for="public-url">Public Application Link</label>
+              <div class="copy-row">
+                <input
+                  class="field__input"
+                  id="public-url"
+                  type="text"
+                  readonly
+                  placeholder="Available after publishing"
+                />
+                <button type="button" class="button button--ghost" id="copy-btn">
+                  <span data-label>Copy</span>
+                </button>
+              </div>
+              <p class="field__hint" id="published-at-hint"></p>
+            </div>
+
+            <button type="button" class="button button--primary publish-panel__cta" id="publish-btn">
+              <span data-label>Update to Published</span>
             </button>
-          </div>
-          <p class="field__hint" id="published-at-hint"></p>
-          <p class="published-panel__applications">
-            <a class="button button--primary" id="view-applications-link" href="applications.html">
-              View applications
-            </a>
-            <a class="button button--ghost" id="view-screening-link" href="ai-screening.html">
-              View AI screening
-            </a>
-          </p>
-        </div>
 
-        <div class="card" id="closed-note" hidden>
-          <p class="text-muted">This vacancy is closed and cannot be published.</p>
+            <p class="publish-panel__links" id="published-links" hidden>
+              <a class="button button--ghost" id="view-applications-link" href="applications.html">
+                View applications
+              </a>
+              <a class="button button--ghost" id="view-screening-link" href="ai-screening.html">
+                View AI screening
+              </a>
+            </p>
+
+            <p class="text-muted text-sm" id="closed-note" hidden>
+              This vacancy is closed and cannot be published.
+            </p>
+          </aside>
         </div>
       </div>
     </section>
