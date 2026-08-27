@@ -75,6 +75,7 @@ const select = $('vacancy-select');
 const statusFilter = $('status-filter');
 const searchInput = $('candidate-search');
 const runBtn = $('screening-run');
+const selectCandidatesLink = $('select-candidates-link');
 const summaryEl = $('screening-summary');
 const vacancyEl = $('screening-vacancy');
 const loadingEl = $('screening-loading');
@@ -430,8 +431,19 @@ async function runPending() {
 
 // --- data loading ----------------------------------------------------
 
+function updateSelectCandidatesLink(vacancyId) {
+  if (vacancyId) {
+    selectCandidatesLink.href = withHashParam('candidates.html', 'vacancy', vacancyId);
+    selectCandidatesLink.hidden = false;
+  } else {
+    selectCandidatesLink.hidden = true;
+  }
+}
+
 async function loadScreenings(vacancyId, { silent = false } = {}) {
   if (!silent) alert.hide();
+
+  updateSelectCandidatesLink(vacancyId);
 
   if (!vacancyId) {
     currentApplications = [];

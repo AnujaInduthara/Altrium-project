@@ -547,6 +547,91 @@ review page share.
   CV-unavailable states, "recommendations only" disclaimer).
 - `vacancy.html` — the published panel gains a **View AI screening** link.
 
+## PB-07: HR selects candidates
+
+The **selection** stage. After reviewing the AI-screened applicants (PB-06), HR
+opens a vacancy's **Select Candidates** page, explicitly ticks the applicants who
+should proceed to the interview process, confirms, and those applications become
+**candidates**. The AI never makes this call — its score / rank / matched skills
+are shown to inform the decision, and are left completely untouched by it.
+
+A "candidate" is not a new entity: it is an application whose lifecycle has
+advanced `submitted → selected`. It keeps every relationship it already had —
+vacancy, CV, AI screening result.
+
+> **Migration required:** run
+> [`backend/sql/006_add_candidate_selection.sql`](backend/sql/006_add_candidate_selection.sql)
+> after `005`. It adds `selected_at` / `selected_by` to `applications` (plus an
+> audit check constraint and a `(vacancy_id, status)` index). `'selected'` was
+> already an allowed `status` value since migration `004`, so no data migration
+> is needed.
+
+### Flow
+
+```
+Vacancies → open a published vacancy → "Select candidates"
+      │      (or AI Screening / Candidates sidebar item → pick a vacancy)
+      ▼
+candidates.html#vacancy=<id>
+      │  GET /api/vacancies/:id/applications   (owner-checked; each row carries its `screening`)
+      ▼
+Eligible applicants (status 'submitted') shown with a checkbox + AI score + rank;
+already-selected candidates shown read-only above
+      │  tick applicants → "Select Candidates" → confirm in a dialog
+      ▼
+POST /api/vacancies/:id/candidates/select   { applicationIds: [...] }
+      │  authenticateUser → requireHR → getVacancyForUser (owner check)
+      │  → every id must belong to this vacancy AND be 'submitted'
+      │  → single atomic UPDATE ... WHERE id = ANY(:ids)
+      │       AND vacancy_id = :id AND status = 'submitted'
+      ▼
+200 { success: true, data: { selectedCount, newlySelectedCount, candidates: [...] } }
+      → success confirmation; the selected applicants now appear as candidates
+```
+
+### API
+
+| endpoint | notes |
+|---|---|
+| `POST /api/vacancies/:id/candidates/select` | **new.** HR only, owner-checked. Body `{ applicationIds: string[] }`. Transitions each `submitted` application to `selected`, recording `selected_by` (the authenticated HR user) and `selected_at` (server time). Returns the refreshed candidate list (selected applications + their AI screening summary). |
+| `GET /api/vacancies/:id/applications` | unchanged shape; each application row now also carries `selected_at` / `selected_by`, and the Select Candidates page reads it to separate eligible applicants from existing candidates. |
+
+| status | when |
+|---|---|
+| `200` | selection saved (idempotent — re-submitting the same set is safe, no duplicate candidates) |
+| `400` | `NO_APPLICATIONS_SELECTED` (empty selection), `INVALID_REQUEST` (malformed body), `TOO_MANY_APPLICATIONS`, or `INVALID_APPLICATION` (an id that is not one of this vacancy's applications — e.g. from another vacancy) |
+| `401` | missing / invalid / expired token |
+| `403` | authenticated but not HR |
+| `404` | `VACANCY_NOT_FOUND` — unknown vacancy, or one owned by another HR user (reported as 404 so nothing leaks) |
+| `409` | `APPLICATION_NOT_ELIGIBLE` — a selected id is `rejected` or otherwise not in a selectable state |
+
+### Security & data integrity
+
+- Every part of the operation is server-authorized: `authenticateUser` +
+  `requireHR`, then an explicit "caller owns the parent vacancy" check, then a
+  per-id check that each application belongs to that vacancy. The HR identity,
+  the vacancy ownership and the application–vacancy relationship are **never**
+  taken from the request body.
+- The write is one conditional `UPDATE` guarded by `status = 'submitted'`, so it
+  is atomic and **idempotent**: a double-click / retried request updates zero
+  rows for an already-selected applicant instead of creating a second candidate.
+- `application_screenings` (score, rank, matched / missing skills, summary,
+  timestamps) and the CV file + its metadata are **not touched** by selection.
+- RLS on `applications` is unchanged — enabled with no policies; this mutation is
+  backend-only via the service-role key, which never reaches the browser.
+
+### Frontend
+
+- `candidates.html` / `candidatesPage.js` / `css/pages/candidates.css` — **new**
+  Select Candidates screen: workflow step indicator, vacancy picker, a read-only
+  "Selected candidates" section, a checkbox list of eligible applicants (AI score
+  + rank shown, never auto-ticked), a live "N applicants selected" count,
+  Cancel / Select Candidates, a confirmation dialog, and loading / empty /
+  success / error / validation states.
+- `vacancy.html` and `ai-screening.html` gain a **Select candidates** link
+  (deep-linked to the chosen vacancy). The **Candidates** sidebar item now
+  resolves to this page.
+
 ## Project structure
 
 ```
@@ -598,6 +683,7 @@ In the Supabase SQL editor, run the migrations in order:
 3. [`backend/sql/003_add_vacancy_publishing.sql`](backend/sql/003_add_vacancy_publishing.sql) — `public_token` + `published_at` (PB-02).
 4. [`backend/sql/004_create_applications.sql`](backend/sql/004_create_applications.sql) — `applications` table + private `candidate-cvs` storage bucket (PB-03).
 5. [`backend/sql/005_create_application_screenings.sql`](backend/sql/005_create_application_screenings.sql) — `application_screenings` table (PB-05 AI CV screening results), RLS with no policies.
+6. [`backend/sql/006_add_candidate_selection.sql`](backend/sql/006_add_candidate_selection.sql) — `selected_at` / `selected_by` audit columns on `applications` + supporting constraint/index (PB-07 candidate selection).
 
 There is no self-service HR sign-up. To create your first HR user:
 
@@ -653,6 +739,7 @@ There is nothing machine-specific to change:
 - HR authorization is decided server-side by looking up `profiles.role`, not from anything the client sends.
 - `profiles` and `job_vacancies` have RLS enabled with per-owner policies; there is no anon policy on either.
 - `applications` has RLS enabled with **no** policies; CVs live in a **private** bucket. Applicant PII and CVs are backend-only.
+- Candidate selection (PB-07) is an HR-only, owner-checked mutation: the acting HR user, the vacancy ownership and every application's vacancy are verified server-side, and the `submitted → selected` write is a single atomic, idempotent statement. AI screening results and CVs are never modified by it.
 - The `DRAFT -> PUBLISHED` transition and the `public_token` are set only by the backend; a request body cannot influence them.
 - The public application link contains only the random token — no internal id, no HR identity.
 - Applicant submissions never touch Supabase directly; the browser only talks to the backend, which validates everything (including the CV bytes).
@@ -666,10 +753,12 @@ Vacancy — public link generated), PB-03 (Applicant submits a CV application),
 PB-04 partial (HR reviews the application list + opens CVs), PB-05 (AI-assisted
 CV screening — score, recommendation, matched/missing skills, summary stored per
 application; advisory only), PB-06 (HR reviews the AI-filtered applicants —
-ranked AI Screening list + read-only Applicant Review with secure CV access).
+ranked AI Screening list + read-only Applicant Review with secure CV access),
+PB-07 (HR selects candidates — explicit, confirmed `submitted → selected`
+transition; the selected applications become candidates for Sprint 2).
 
-Not yet implemented: PB-07 candidate selection, PB-08 vacancy closing.
-Application `status` stays `submitted` — neither the AI screening pipeline nor
-PB-06 changes it, and no HR status transitions exist yet.
+Not yet implemented: PB-08 vacancy closing. The only HR status transition that
+exists is PB-07's `submitted → selected`; the AI screening pipeline still never
+changes `applications.status`.
 
 

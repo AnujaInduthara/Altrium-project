@@ -101,6 +101,7 @@ function render(vacancy) {
     );
     $('view-applications-link').href = withHashParam('applications.html', 'vacancy', vacancy.id);
     $('view-screening-link').href = withHashParam('ai-screening.html', 'vacancy', vacancy.id);
+    $('select-candidates-link').href = withHashParam('candidates.html', 'vacancy', vacancy.id);
     text('publish-panel-subtitle', 'This vacancy is live. Candidates can apply using the link below.');
   } else {
     $('public-url').value = '';

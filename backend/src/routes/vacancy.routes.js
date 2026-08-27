@@ -18,4 +18,7 @@ router.get('/:id/applications', applicationController.listVacancyApplications);
 // PB-05 — bulk (re)run AI screening for every not-yet-completed application.
 router.post('/:id/screenings/run-pending', screeningController.runPendingScreenings);
 
+// PB-07 — HR selects applicants to proceed as candidates (submitted -> selected).
+router.post('/:id/candidates/select', applicationController.selectCandidates);
+
 module.exports = router;
