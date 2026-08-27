@@ -90,6 +90,7 @@ function render(vacancy) {
       vacancy.published_at ? `Published ${formatDateTime(vacancy.published_at)}` : ''
     );
     $('view-applications-link').href = withHashParam('applications.html', 'vacancy', vacancy.id);
+    $('view-screening-link').href = withHashParam('ai-screening.html', 'vacancy', vacancy.id);
   }
 
   $('publish-modal-body').textContent = `Are you sure you want to publish “${vacancy.job_title}”?`;

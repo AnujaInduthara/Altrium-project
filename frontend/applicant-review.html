@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Applicant Review — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app" data-active-nav="ai-screening">
+    <section class="page" id="review-page" hidden>
+      <a class="back-link" id="back-link" href="ai-screening.html">&larr; Back to AI Screening</a>
+
+      <p class="status-message" id="review-loading" role="status">Loading applicant…</p>
+
+      <div class="alert" id="review-alert" role="alert" aria-live="assertive" hidden></div>
+
+      <div class="card" id="review-error" hidden>
+        <h1 class="heading-lg" id="review-error-title">This applicant could not be found.</h1>
+        <p class="text-muted" id="review-error-message">
+          It may have been removed, or you may not have access to this vacancy.
+        </p>
+        <p><a class="button button--ghost" href="ai-screening.html">Back to AI Screening</a></p>
+      </div>
+
+      <div id="review-detail" hidden>
+        <nav class="review-breadcrumb" aria-label="Breadcrumb">
+          <a href="vacancies.html">Job Vacancies</a>
+          <span aria-hidden="true">/</span>
+          <a id="crumb-vacancy" href="vacancies.html">Vacancy</a>
+          <span aria-hidden="true">/</span>
+          <a id="crumb-screening" href="ai-screening.html">AI Screening</a>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page" id="crumb-applicant">Applicant</span>
+        </nav>
+
+        <header class="page-header review-header">
+          <div class="review-header__heading">
+            <div class="review-header__title-row">
+              <h1 class="page-header__title" id="review-name"></h1>
+              <span class="badge" id="review-status"></span>
+            </div>
+            <p class="page-header__subtitle" id="review-subtitle"></p>
+          </div>
+
+          <div class="review-header__actions">
+            <button type="button" class="button button--primary" id="view-cv-btn">
+              <span data-label>View CV</span>
+            </button>
+            <button type="button" class="button button--ghost" id="download-cv-btn">
+              <span data-label>Download CV</span>
+            </button>
+          </div>
+        </header>
+
+        <p class="review-disclaimer">
+          <strong>AI-generated insights are recommendations only.</strong>
+          The score, ranking and skill analysis below come from an automated CV
+          screening pass. They are advisory — the final decision on this
+          applicant remains with HR.
+        </p>
+
+        <div class="card review-score" id="review-score-card">
+          <div class="review-score__head">
+            <h2 class="review-section__title">AI Screening Score</h2>
+            <span class="badge" id="review-screening-status"></span>
+          </div>
+
+          <div id="review-score-body" hidden>
+            <div class="review-score__figure">
+              <span class="review-score__value" id="review-score"></span>
+              <span class="review-score__unit">/ 100</span>
+              <span class="review-score__rank badge" id="review-rank" hidden></span>
+            </div>
+            <div class="review-score__meter" aria-hidden="true">
+              <span class="review-score__meter-fill" id="review-score-meter"></span>
+            </div>
+            <p class="review-score__rec" id="review-rec"></p>
+            <p class="review-score__note">
+              AI-generated screening result, based on this vacancy's requirements
+              and the submitted CV. This is a job-relevance match strength, not a
+              probability of being hired.
+            </p>
+          </div>
+
+          <p class="review-pending" id="review-screening-note" hidden></p>
+        </div>
+
+        <div class="review-grid">
+          <div class="card">
+            <h2 class="review-section__title">Applicant Information</h2>
+            <dl class="review-info">
+              <div class="review-info__row">
+                <dt>Email</dt>
+                <dd><a id="review-email-link"><span id="review-email"></span></a></dd>
+              </div>
+              <div class="review-info__row">
+                <dt>Phone</dt>
+                <dd><a id="review-phone-link"><span id="review-phone"></span></a></dd>
+              </div>
+              <div class="review-info__row">
+                <dt>Location</dt>
+                <dd id="review-location"></dd>
+              </div>
+              <div class="review-info__row">
+                <dt>Applied</dt>
+                <dd id="review-applied"></dd>
+              </div>
+              <div class="review-info__row">
+                <dt>Reference</dt>
+                <dd><code id="review-reference"></code></dd>
+              </div>
+              <div class="review-info__row">
+                <dt>CV</dt>
+                <dd id="review-cv-meta"></dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="card" id="review-match-card" hidden>
+            <h2 class="review-section__title">Experience &amp; Education</h2>
+            <dl class="review-info">
+              <div class="review-info__row">
+                <dt>Experience match</dt>
+                <dd id="review-exp"></dd>
+              </div>
+              <div class="review-info__row">
+                <dt>Education match</dt>
+                <dd id="review-edu"></dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+
+        <div class="card review-skills" id="review-skills-card" hidden>
+          <div class="review-skills__group">
+            <h2 class="review-section__title">Matched Skills</h2>
+            <ul class="chip-list" id="review-matched"></ul>
+            <p class="text-muted text-sm" id="review-matched-empty" hidden>
+              No matched skills identified.
+            </p>
+          </div>
+          <div class="review-skills__group">
+            <h2 class="review-section__title">Missing Skills</h2>
+            <ul class="chip-list chip-list--muted" id="review-missing"></ul>
+            <p class="text-muted text-sm" id="review-missing-empty" hidden>
+              No missing required skills identified.
+            </p>
+          </div>
+        </div>
+
+        <div class="card" id="review-summary-card" hidden>
+          <h2 class="review-section__title">AI Summary</h2>
+          <p class="review-summary" id="review-summary"></p>
+        </div>
+
+        <p class="review-disclaimer review-disclaimer--foot">
+          AI-generated insights are recommendations only. Final decisions remain
+          with HR.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/applicantReviewPage.js"></script>
+</body>
+</html>

@@ -229,11 +229,15 @@ async function downloadCv(cvPath) {
 }
 
 // Short-lived signed URL for a CV in the private bucket. Default 120s — long
-// enough to open, short enough that a leaked URL is near-useless.
-async function createCvSignedUrl(cvPath, expiresIn = 120) {
+// enough to open, short enough that a leaked URL is near-useless. Pass
+// `download` (a filename) to force a "save as" instead of inline rendering —
+// used for the PB-06 "Download CV" action (and DOCX files, which browsers
+// cannot preview inline anyway).
+async function createCvSignedUrl(cvPath, { expiresIn = 120, download = null } = {}) {
+  const options = download ? { download: String(download).slice(0, 255) } : undefined;
   const { data, error } = await supabaseAdmin.storage
     .from(CV_BUCKET)
-    .createSignedUrl(cvPath, expiresIn);
+    .createSignedUrl(cvPath, expiresIn, options);
 
   if (error || !data || !data.signedUrl) {
     throw wrapDbError('Failed to create a CV link', error || new Error('no signed url returned'));

@@ -43,9 +43,13 @@
         </button>
       </div>
 
+      <p class="screening-vacancy" id="screening-vacancy" hidden></p>
+
       <div class="screening-summary" id="screening-summary" hidden>
         <span class="screening-summary__item" data-summary-total></span>
         <span class="screening-summary__item screening-summary__item--ok" data-summary-completed></span>
+        <span class="screening-summary__item" data-summary-average hidden></span>
+        <span class="screening-summary__item" data-summary-top hidden></span>
         <span class="screening-summary__item" data-summary-running hidden></span>
         <span class="screening-summary__item screening-summary__item--warn" data-summary-failed hidden></span>
         <span class="screening-summary__item" data-summary-pending hidden></span>
@@ -64,6 +68,12 @@
       </div>
 
       <ol class="screening-list" id="screening-list" hidden></ol>
+
+      <p class="screening-foot-note" id="screening-foot-note" hidden>
+        AI-generated screening results are recommendations only. Ranking and
+        scores are advisory — the final decision on every applicant remains with
+        HR.
+      </p>
     </section>
   </div>
 
@@ -106,6 +116,7 @@
       </div>
 
       <div class="screening-card__actions">
+        <a class="button button--primary" data-view>View</a>
         <button type="button" class="button button--ghost screening-card__cv" data-view-cv>
           <span data-cv-label>View CV</span>
         </button>
