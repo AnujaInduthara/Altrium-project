@@ -3,6 +3,7 @@ const vacancyService = require('../services/vacancy.service');
 const applicationService = require('../services/application.service');
 const screeningService = require('../services/screening/screeningService');
 const { toScreeningView } = require('./screening.controller');
+const { normalizeApplicationIds } = require('../utils/candidateSelection');
 
 // A VacancyError (FORBIDDEN when the vacancy belongs to another HR user, etc.)
 // translates straight to a response; anything else is an unexpected failure.
@@ -156,4 +157,78 @@ async function getApplicationReview(req, res) {
   }
 }
 
-module.exports = { listVacancyApplications, getApplicationCv, getApplicationReview };
+// POST /api/vacancies/:id/candidates/select — HR only. Transitions the given
+// applications 'submitted' -> 'selected' (they become candidates for the next
+// recruitment stage). Body: { applicationIds: [uuid, …] }.
+//
+// The AI never makes this decision: PB-05 screening results are left untouched.
+// This is an explicit, authenticated, owner-checked HR action.
+async function selectCandidates(req, res) {
+  try {
+    // 1. Validate the request body (before any DB work).
+    const normalized = normalizeApplicationIds(req.body && req.body.applicationIds);
+    if (!normalized.valid) {
+      return errorResponse(res, 400, normalized.code, normalized.message);
+    }
+
+    // 2. Authorize: the caller must own the target vacancy. An unknown vacancy,
+    //    or one owned by another HR user, is reported as 404 so nothing leaks.
+    let vacancy;
+    try {
+      vacancy = await vacancyService.getVacancyForUser(req.params.id, req.user.id);
+    } catch (err) {
+      if (err && err.isVacancyError && err.code === 'FORBIDDEN') {
+        return errorResponse(res, 404, 'VACANCY_NOT_FOUND', 'This vacancy could not be found.');
+      }
+      throw err;
+    }
+    if (!vacancy) {
+      return errorResponse(res, 404, 'VACANCY_NOT_FOUND', 'This vacancy could not be found.');
+    }
+
+    // 3. Perform the selection (validates every id belongs to this vacancy and
+    //    is eligible; the write is a single atomic, idempotent UPDATE).
+    const result = await applicationService.selectCandidates({
+      vacancyId: vacancy.id,
+      applicationIds: normalized.ids,
+      hrUserId: req.user.id,
+    });
+
+    // 4. Return the refreshed candidate list (selected applications for this
+    //    vacancy, with their AI screening summary) so the UI can update without
+    //    a second round trip.
+    const [applications, screenings] = await Promise.all([
+      applicationService.listApplicationsForVacancy(vacancy.id),
+      screeningService.listScreeningsForVacancy(vacancy.id),
+    ]);
+    const byApplication = new Map(screenings.map((s) => [s.application_id, s]));
+    const candidates = applications
+      .filter((application) => application.status === 'selected')
+      .map((application) => ({
+        ...application,
+        screening: toScreeningView(byApplication.get(application.id)),
+      }));
+
+    return successResponse(res, {
+      selectedCount: result.selectedCount,
+      newlySelectedCount: result.newlySelectedCount,
+      candidates,
+      message:
+        result.newlySelectedCount === result.selectedCount
+          ? `${result.selectedCount} applicant${result.selectedCount === 1 ? '' : 's'} selected to proceed as candidates.`
+          : 'Selection saved. Some applicants were already selected.',
+    });
+  } catch (err) {
+    if (err && err.isApplicationError) {
+      return errorResponse(res, err.status, err.code, err.message);
+    }
+    return handleError(res, err, 'selectCandidates');
+  }
+}
+
+module.exports = {
+  listVacancyApplications,
+  getApplicationCv,
+  getApplicationReview,
+  selectCandidates,
+};

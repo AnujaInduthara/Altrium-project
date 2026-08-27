@@ -5,6 +5,7 @@ const {
   DUPLICATE_WINDOW_MS,
   CV_BUCKET,
 } = require('../config/applicationOptions');
+const { partitionSelection } = require('../utils/candidateSelection');
 
 // A typed, HTTP-aware error the controller translates straight to a response
 // without leaking internals (mirrors VacancyError in vacancy.service.js).
@@ -169,6 +170,8 @@ const APPLICATION_HR_FIELDS = [
   'cv_size_bytes',
   'cv_content_type',
   'created_at',
+  'selected_at',
+  'selected_by',
 ].join(', ');
 
 // All applications for one vacancy, newest first. The caller (controller) must
@@ -245,11 +248,94 @@ async function createCvSignedUrl(cvPath, { expiresIn = 120, download = null } = 
   return { url: data.signedUrl, expiresIn };
 }
 
+// ---------------------------------------------------------------------------
+// PB-07 — HR selects candidates.
+// ---------------------------------------------------------------------------
+
+// Minimal (id, status) rows for every application under one vacancy. Used to
+// verify that every id in a selection request really belongs to this vacancy
+// and is eligible, before any write happens.
+async function listApplicationStatusesForVacancy(vacancyId) {
+  const { data, error } = await supabaseAdmin
+    .from('applications')
+    .select('id, status')
+    .eq('vacancy_id', vacancyId);
+
+  if (error) throw wrapDbError('Failed to load applications for selection', error);
+  return data || [];
+}
+
+// Transition the given applications 'submitted' -> 'selected' for one vacancy,
+// recording the acting HR user and a server timestamp. The caller (controller)
+// must already have authenticated the HR user and confirmed they own the
+// vacancy.
+//
+// Safety / correctness:
+//   * Every id is checked against the vacancy's own applications first — an id
+//     from another vacancy (or a fabricated one) is rejected as
+//     INVALID_APPLICATION; a non-eligible status is APPLICATION_NOT_ELIGIBLE.
+//   * The UPDATE is a single conditional statement guarded by
+//     `.eq('status', 'submitted')`, so it is atomic and idempotent: a duplicate
+//     / concurrent submit updates zero rows for an already-selected applicant
+//     instead of creating a second "candidate" or erroring.
+//   * The AI screening row and the CV are never touched.
+async function selectCandidates({ vacancyId, applicationIds, hrUserId }) {
+  const vacancyApplications = await listApplicationStatusesForVacancy(vacancyId);
+  const { invalid, alreadySelected, ineligible, eligible } = partitionSelection(
+    applicationIds,
+    vacancyApplications
+  );
+
+  if (invalid.length > 0) {
+    throw new ApplicationError(
+      'INVALID_APPLICATION',
+      400,
+      'One or more selected applicants are not part of this vacancy.'
+    );
+  }
+  if (ineligible.length > 0) {
+    throw new ApplicationError(
+      'APPLICATION_NOT_ELIGIBLE',
+      409,
+      'One or more selected applicants can no longer be selected as candidates.'
+    );
+  }
+
+  let newlySelected = [];
+  if (eligible.length > 0) {
+    const { data, error } = await supabaseAdmin
+      .from('applications')
+      .update({
+        status: APPLICATION_STATUS.SELECTED,
+        selected_at: new Date().toISOString(),
+        selected_by: hrUserId,
+      })
+      .in('id', eligible)
+      .eq('vacancy_id', vacancyId)
+      .eq('status', APPLICATION_STATUS.SUBMITTED)
+      .select('id');
+
+    if (error) throw wrapDbError('Failed to select candidates', error);
+    newlySelected = data || [];
+  }
+
+  // Every requested id is now 'selected' (either just transitioned, or already
+  // was — the idempotent path). `newlySelectedCount` can be lower than
+  // `eligible.length` only under a concurrent duplicate request, which is fine.
+  return {
+    selectedCount: applicationIds.length,
+    newlySelectedCount: newlySelected.length,
+    alreadySelectedCount: alreadySelected.length,
+  };
+}
+
 module.exports = {
   createApplication,
   listApplicationsForVacancy,
   getApplicationById,
   getApplicationForScreening,
+  listApplicationStatusesForVacancy,
+  selectCandidates,
   downloadCv,
   createCvSignedUrl,
   ApplicationError,
