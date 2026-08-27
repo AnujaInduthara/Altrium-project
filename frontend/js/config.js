@@ -12,4 +12,9 @@ export const APP_CONFIG = {
   SUPABASE_URL: 'https://adrrzzyvsxdgljhubldb.supabase.co',
   SUPABASE_ANON_KEY,
   API_BASE_URL: 'http://localhost:5000/api',
+
+  // Max CV upload size shown to applicants and enforced client-side (PB-03).
+  // The backend re-enforces this — keep it in sync with CV_MAX_BYTES there
+  // (backend/src/config/applicationOptions.js) and the storage bucket limit.
+  MAX_CV_MB: 5,
 };

@@ -20,7 +20,7 @@ frontend/
 ├── vacancies.html        Job Vacancies list (PB-01) — cards link to the details page
 ├── create-vacancy.html   Create New Vacancy form (PB-01) — saves a DRAFT
 ├── vacancy.html          Vacancy details + Publish action (PB-02)
-├── apply.html            Public application page (PB-02 shell; no auth) — PB-03 adds the form
+├── apply.html            Public application page (PB-03) — view vacancy + submit a CV application, no auth
 │
 ├── assets/
 │   └── icons/
@@ -66,10 +66,11 @@ frontend/
     ├── services/
     │   ├── authService.js       Auth + HR-authorization API (no DOM).
     │   ├── vacancyService.js    Vacancy API (create / list / get / publish), bearer token.
-    │   └── publicVacancyService.js  Unauthenticated published-vacancy lookup by token.
+    │   └── publicVacancyService.js  Unauthenticated published-vacancy lookup + application submission.
     ├── utils/
     │   ├── validators.js        Pure form-validation helpers.
     │   ├── vacancyValidators.js Vacancy form rules + dropdown option lists.
+    │   ├── applicantValidators.js Applicant form + CV file rules (PB-03); mirrors the server.
     │   └── urlParams.js         Read id/token from query OR hash (survives clean-URL redirects).
     ├── components/              Reusable DOM behaviours (factory functions)
     │   ├── icons.js             Shared inline-SVG icon set.
