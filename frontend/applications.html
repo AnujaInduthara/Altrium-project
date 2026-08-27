@@ -65,6 +65,35 @@
         <h2 class="application-card__name" data-name></h2>
         <span class="badge application-card__status" data-status></span>
       </div>
+      <!-- PB-05: AI screening summary. Advisory only — the AI does not decide. -->
+      <div class="screening" data-screening hidden>
+        <div class="screening__head">
+          <span class="screening__label">AI Screening</span>
+          <span class="badge screening__status" data-screening-status></span>
+        </div>
+        <div class="screening__body" data-screening-body hidden>
+          <div class="screening__score">
+            <span class="screening__score-value" data-screening-score></span>
+            <span class="screening__score-max">/ 100</span>
+            <span class="screening__rec" data-screening-rec></span>
+            <span class="screening__rank" data-screening-rank hidden></span>
+          </div>
+          <p class="screening__summary" data-screening-summary></p>
+          <div class="screening__skills" data-screening-matched hidden>
+            <span class="screening__skills-label">Matched</span>
+            <span data-screening-matched-list></span>
+          </div>
+          <div class="screening__skills" data-screening-missing hidden>
+            <span class="screening__skills-label">Not demonstrated</span>
+            <span data-screening-missing-list></span>
+          </div>
+        </div>
+        <p class="screening__note" data-screening-note hidden></p>
+        <button type="button" class="button button--ghost screening__retry" data-screening-retry hidden>
+          Re-run AI screening
+        </button>
+      </div>
+
       <dl class="application-card__details">
         <div class="application-card__row">
           <dt>Email</dt>

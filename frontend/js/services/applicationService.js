@@ -36,4 +36,22 @@ export const ApplicationService = {
     );
     return toResult(response);
   },
+
+  // PB-05: the AI screening result for one application (owner-checked).
+  async getScreening(applicationId) {
+    const response = await fetch(
+      `${apiBase}/applications/${encodeURIComponent(applicationId)}/screening`,
+      { headers: await authHeaders() }
+    );
+    return toResult(response);
+  },
+
+  // PB-05: HR-authorized retry of a screening that previously failed.
+  async retryScreening(applicationId) {
+    const response = await fetch(
+      `${apiBase}/applications/${encodeURIComponent(applicationId)}/screening/retry`,
+      { method: 'POST', headers: await authHeaders() }
+    );
+    return toResult(response);
+  },
 };

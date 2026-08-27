@@ -136,6 +136,17 @@ async function createApplication({ vacancy, input, cv }) {
     throw err;
   }
 
+  // PB-05 trigger: once the application + CV are stored, kick off AI screening.
+  // Fire-and-forget — it runs after the HTTP response and never blocks or fails
+  // the submission. Lazy require avoids a require cycle (the screening service
+  // pulls in this module). This is the seam to move to a real background
+  // worker/queue later without touching the submission path.
+  try {
+    require('./screening/screeningService').screenApplicationInBackground(created.id);
+  } catch (err) {
+    console.error('Failed to start screening for application', created.id, err.message);
+  }
+
   return { reference: created.reference, job_title: vacancy.job_title };
 }
 
@@ -189,6 +200,34 @@ async function getApplicationById(applicationId) {
   return data || null;
 }
 
+// Minimal application shape the PB-05 screening pipeline needs: the CV location
+// and the vacancy to screen against. Returns null for an unknown / malformed id.
+async function getApplicationForScreening(applicationId) {
+  const { data, error } = await supabaseAdmin
+    .from('applications')
+    .select('id, vacancy_id, cv_path, cv_content_type, cv_original_name, status')
+    .eq('id', applicationId)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '22P02') return null; // invalid uuid -> not found
+    throw wrapDbError('Failed to load application for screening', error);
+  }
+  return data || null;
+}
+
+// Server-side private download of a CV from the candidate-cvs bucket. Returns a
+// Node Buffer. The CV bytes never leave the backend — they are extracted to text
+// and only the text (job-relevant content) is sent to the AI provider.
+async function downloadCv(cvPath) {
+  const { data, error } = await supabaseAdmin.storage.from(CV_BUCKET).download(cvPath);
+  if (error || !data) {
+    throw wrapDbError('Failed to download CV', error || new Error('no CV data returned'));
+  }
+  const arrayBuffer = await data.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
 // Short-lived signed URL for a CV in the private bucket. Default 120s — long
 // enough to open, short enough that a leaked URL is near-useless.
 async function createCvSignedUrl(cvPath, expiresIn = 120) {
@@ -206,6 +245,8 @@ module.exports = {
   createApplication,
   listApplicationsForVacancy,
   getApplicationById,
+  getApplicationForScreening,
+  downloadCv,
   createCvSignedUrl,
   ApplicationError,
 };

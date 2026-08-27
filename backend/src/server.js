@@ -4,6 +4,7 @@ const cors = require('cors');
 
 const { APP_URL } = require('./config/app');
 const { isAllowedOrigin } = require('./config/cors');
+const { isScreeningConfigured } = require('./config/aiOptions');
 const authRoutes = require('./routes/auth.routes');
 const hrRoutes = require('./routes/hr.routes');
 const vacancyRoutes = require('./routes/vacancy.routes');
@@ -39,4 +40,11 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
   console.log(`CORS: configured origins = ${APP_URL}; localhost + private LAN origins are also allowed`);
+  console.log(
+    `PB-05 AI CV screening: ${
+      isScreeningConfigured()
+        ? 'enabled'
+        : 'inactive (no AI provider credentials / disabled) — screenings stay pending'
+    }`
+  );
 });

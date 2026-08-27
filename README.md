@@ -373,6 +373,103 @@ GET /api/applications/:id/cv             Authorization: Bearer <access_token>
 No schema or storage changes — this reads the `applications` table and bucket
 created by migration `004`.
 
+## PB-05: System filters CVs using AI
+
+After PB-04 stores a submitted application + CV, the system automatically runs
+an **AI-assisted screening pass**. The AI is an **assistant, not a decision
+maker** — it never hires, rejects, shortlists or selects anyone. It produces
+advisory signals (a 0–100 *AI Screening Score*, an *AI Recommendation*, matched
+/ missing skills, an experience and education assessment, an *AI Screening
+Summary*). The application's own `status` stays `submitted`; HR makes every
+recruitment decision (PB-06/07).
+
+> **Migration required:** run
+> [`backend/sql/005_create_application_screenings.sql`](backend/sql/005_create_application_screenings.sql)
+> after `004`.
+>
+> **AI key optional:** with no `ANTHROPIC_API_KEY` set, screening rows are
+> created as `pending` and the pipeline is inert — PB-01…PB-04 are unaffected.
+
+### Flow
+
+```
+PB-03/PB-04: application + CV stored
+      |  screenApplicationInBackground(applicationId)   (fire-and-forget, after the HTTP response)
+      v
+ensure a screening row (pending)                        [idempotent — UNIQUE(application_id)]
+      |  claim: pending|failed -> processing            [atomic conditional UPDATE — one worker]
+      v
+load + verify dependencies (application, vacancy, CV; application belongs to vacancy)
+      |
+      v
+download CV from the private bucket (service role)  ->  extract text (PDF: pdf-parse, DOCX: mammoth)
+      |  normalize, guard against unreadable/scanned CVs, truncate very large CVs
+      v
+build a vacancy-specific prompt   (CV wrapped as UNTRUSTED DATA, delimiters neutralized)
+      |
+      v
+AI provider  (services/ai — provider abstraction; Anthropic impl; bounded retries + backoff)
+      |
+      v
+validate structured JSON  (0<=score<=100, enums, array types, string caps; reject 120 / "ninety")
+      |
+      v
+recompute the score server-side  = weighted sum of skills/experience/requirements/education
+      |
+      v
+persist COMPLETED   (or FAILED with a safe error_code; the application + CV are never touched)
+      v
+GET /api/vacancies/:id/applications  now returns each application's `screening` summary  (PB-06)
+```
+
+### Database (migration `005`)
+
+`public.application_screenings` — one row per application
+(`application_id` **UNIQUE** = the idempotency guard). Key columns: `status`
+(`pending`/`processing`/`completed`/`failed`), `score` (`0..100` check),
+`recommendation` / `experience_match` / `education_match` (enum checks),
+`skills` / `matched_skills` / `missing_skills` (JSONB arrays), `summary`,
+`score_breakdown` (per-dimension sub-scores + weights), `model_provider` /
+`model_name` / `screening_version`, `error_code`, `attempts`. Indexes on
+`vacancy_id`, `status`, `(vacancy_id, score desc)`. **RLS enabled with no
+policies** — backend-only via the service-role key, exactly like `applications`.
+There is deliberately **no** `hired`/`rejected`/`selected` value: this table
+cannot express a hiring decision.
+
+### API
+
+| endpoint | notes |
+|---|---|
+| `GET /api/vacancies/:id/applications` | unchanged shape + each application now carries a `screening` object (`status`, `score`, `recommendation`, `matched_skills`, `missing_skills`, `summary`, `ai_screening_rank`, `processed_at`, …). |
+| `GET /api/applications/:id/screening` | HR only, owner-checked; the full screening result for one application. `{ screening: { status: "not_started" } }` if it has not run. |
+| `POST /api/applications/:id/screening/retry` | HR only, owner-checked; re-queues a screening that previously **failed**. There is **no** endpoint that lets a client trigger screening for an arbitrary application — it is a system function. |
+
+### Security
+
+- AI API keys and `SUPABASE_SERVICE_ROLE_KEY` are read **server-side only**;
+  the browser never sees them and AI calls only happen on the backend.
+- The CV is downloaded privately, converted to **text**, and only the
+  job-relevant text is sent to the AI provider — never the file, never to the
+  frontend.
+- CV content is **untrusted**: it is wrapped in explicit delimiters, the
+  delimiter/instruction-fence tokens are stripped from the CV text, and the
+  system prompt tells the model to treat everything inside as data.
+- The model's output is **not trusted**: it is schema-validated and the score
+  is recomputed server-side from weighted dimensions before anything is stored.
+- CV contents, extracted text, prompts and API keys are **never logged** —
+  structured logs carry ids, provider/model names, score and duration only.
+- Screening results are internal HR data — applicants can never read them (RLS,
+  no anon policy, backend-only).
+- Fairness: the prompt forbids using protected characteristics and the
+  candidate name/contact details; scoring dimensions are job-relevant only.
+
+### Tests
+
+`cd backend && npm test` also runs `screeningResultValidation`,
+`cvTextExtraction` (real PDF/DOCX fixtures), `screeningPrompt` and
+`screeningPipeline` (the full extract → prompt → validate → score pipeline with
+an injected fake provider — no network).
+
 ## Project structure
 
 ```
@@ -403,6 +500,10 @@ The rest are optional:
 | `CORS_ALLOW_ANY`             | *(optional)* `true` reflects every origin — only behind a trusted proxy |
 | `APP_URL`                    | *(optional)* fallback base URL for the application link when a request has no `Origin` header |
 | `CV_MAX_BYTES`               | *(optional)* max CV upload size in bytes; defaults to `5242880` (5 MiB)     |
+| `AI_PROVIDER`                | *(PB-05)* AI provider for CV screening; currently `anthropic` (default)     |
+| `AI_MODEL`                   | *(PB-05)* provider model id; default `claude-opus-5`                        |
+| `ANTHROPIC_API_KEY`          | *(PB-05)* **server-only secret**. Leave blank to keep AI screening inactive (rows stay `pending`) |
+| `AI_EFFORT` / `AI_MAX_OUTPUT_TOKENS` / `AI_REQUEST_TIMEOUT_MS` / `AI_TEMPERATURE` / `AI_SCORE_WEIGHTS` / `AI_SCREENING_ENABLED` | *(PB-05, optional)* screening tuning — see `.env.example` |
 
 Run:
 
@@ -418,6 +519,7 @@ In the Supabase SQL editor, run the migrations in order:
 2. [`backend/sql/002_create_job_vacancies.sql`](backend/sql/002_create_job_vacancies.sql) — `job_vacancies` table (PB-01).
 3. [`backend/sql/003_add_vacancy_publishing.sql`](backend/sql/003_add_vacancy_publishing.sql) — `public_token` + `published_at` (PB-02).
 4. [`backend/sql/004_create_applications.sql`](backend/sql/004_create_applications.sql) — `applications` table + private `candidate-cvs` storage bucket (PB-03).
+5. [`backend/sql/005_create_application_screenings.sql`](backend/sql/005_create_application_screenings.sql) — `application_screenings` table (PB-05 AI CV screening results), RLS with no policies.
 
 There is no self-service HR sign-up. To create your first HR user:
 
@@ -483,8 +585,10 @@ There is nothing machine-specific to change:
 
 Done: Step 0 (HR Login), PB-01 (Create Job Vacancy — draft), PB-02 (Publish
 Vacancy — public link generated), PB-03 (Applicant submits a CV application),
-PB-04 partial (HR reviews the application list + opens CVs).
+PB-04 partial (HR reviews the application list + opens CVs), PB-05 (AI-assisted
+CV screening — score, recommendation, matched/missing skills, summary stored per
+application; advisory only).
 
-Not yet implemented: PB-05 AI CV screening, PB-06 AI-filtered applicant review,
-PB-07 candidate selection, PB-08 vacancy closing. Application `status` stays
-`submitted` — no transitions yet.
+Not yet implemented: PB-06 AI-filtered applicant review UI, PB-07 candidate
+selection, PB-08 vacancy closing. Application `status` stays `submitted` — the
+AI screening pipeline never changes it, and no HR status transitions exist yet.
