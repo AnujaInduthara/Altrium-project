@@ -421,19 +421,27 @@ async function listScreeningsForVacancy(vacancyId) {
   });
 }
 
-// HR-initiated retry of a screening that previously FAILED. Resets it to pending
-// (and clears the attempt counter so the bounded retries apply fresh), then
-// re-runs it in the background. Only a failed screening can be retried.
+// HR-initiated (re)run of a screening. Handles every non-running state:
+//   - no row yet  -> create one (e.g. the application was stored before any AI
+//                    credentials were configured), then queue it
+//   - pending     -> was never processed; just trigger the pipeline
+//   - failed      -> reset to pending, clear the attempt counter, re-run
+//   - completed   -> reset to pending and re-run (e.g. the vacancy changed)
+//   - processing  -> report alreadyRunning and do nothing
 async function retryScreening(applicationId) {
-  const current = await getScreeningForApplication(applicationId);
+  let current = await getScreeningForApplication(applicationId);
+
   if (!current) {
-    throw new ScreeningError(ERROR_CODES.DEPENDENCY_MISSING, 'No screening exists for this application yet.');
+    const stub = await applicationService.getApplicationForScreening(applicationId);
+    if (!stub) {
+      throw new ScreeningError(ERROR_CODES.DEPENDENCY_MISSING, 'Application not found.');
+    }
+    await ensureScreeningRow(applicationId, stub.vacancy_id);
+    current = await getScreeningForApplication(applicationId);
   }
-  if (current.status === SCREENING_STATUS.PROCESSING) {
+
+  if (current && current.status === SCREENING_STATUS.PROCESSING) {
     return { status: current.status, alreadyRunning: true };
-  }
-  if (current.status !== SCREENING_STATUS.FAILED) {
-    return { status: current.status, alreadyRunning: false };
   }
 
   const { error } = await supabaseAdmin
@@ -447,12 +455,40 @@ async function retryScreening(applicationId) {
       processing_completed_at: null,
     })
     .eq('application_id', applicationId)
-    .eq('status', SCREENING_STATUS.FAILED);
+    .in('status', [SCREENING_STATUS.PENDING, SCREENING_STATUS.FAILED, SCREENING_STATUS.COMPLETED]);
 
-  if (error) throw wrapDbError('Failed to queue screening retry', error);
+  if (error) throw wrapDbError('Failed to queue screening (re)run', error);
 
   screenApplicationInBackground(applicationId);
   return { status: SCREENING_STATUS.PENDING, alreadyRunning: false };
+}
+
+// Bulk trigger for the AI Screening page: queue a run for every application
+// under a vacancy whose screening has not completed and is not already running
+// (pending, failed, or never created). Completed screenings are left untouched.
+// Returns { queued, total }.
+async function runPendingScreeningsForVacancy(vacancyId) {
+  const [applications, screenings] = await Promise.all([
+    applicationService.listApplicationsForVacancy(vacancyId),
+    listScreeningsForVacancy(vacancyId),
+  ]);
+  const byApplication = new Map(screenings.map((s) => [s.application_id, s]));
+
+  let queued = 0;
+  for (const application of applications) {
+    const existing = byApplication.get(application.id);
+    const status = existing ? existing.status : null;
+    if (status === SCREENING_STATUS.PROCESSING || status === SCREENING_STATUS.COMPLETED) {
+      continue;
+    }
+    try {
+      await retryScreening(application.id);
+      queued += 1;
+    } catch (err) {
+      console.error('runPendingScreeningsForVacancy: could not queue', application.id, err.message);
+    }
+  }
+  return { queued, total: applications.length };
 }
 
 module.exports = {
@@ -462,5 +498,6 @@ module.exports = {
   getScreeningForApplication,
   listScreeningsForVacancy,
   retryScreening,
+  runPendingScreeningsForVacancy,
   ScreeningError,
 };

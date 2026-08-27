@@ -2,6 +2,7 @@ const { successResponse, errorResponse } = require('../utils/response');
 const vacancyService = require('../services/vacancy.service');
 const applicationService = require('../services/application.service');
 const screeningService = require('../services/screening/screeningService');
+const { isScreeningConfigured } = require('../config/aiOptions');
 
 // HR-facing, read-only + retry endpoints for PB-05 screening results. All of
 // these are already behind authenticateUser + requireHR (see the router); each
@@ -73,27 +74,24 @@ async function getApplicationScreening(req, res) {
 }
 
 // POST /api/applications/:id/screening/retry
-// HR-authorized manual retry of a screening that previously FAILED.
+// HR-authorized (re)run of one application's AI screening — covers a screening
+// that failed, one still pending (e.g. submitted before AI was configured), and
+// a completed one HR wants re-run.
 async function retryApplicationScreening(req, res) {
   try {
     const owned = await resolveOwnedApplication(req, res);
     if (!owned) return undefined;
+
+    if (!isScreeningConfigured()) {
+      return errorResponse(res, 503, 'SCREENING_UNAVAILABLE', 'AI screening is not configured on the server.');
+    }
 
     const outcome = await screeningService.retryScreening(owned.application.id);
 
     if (outcome.alreadyRunning) {
       return successResponse(res, { status: outcome.status, message: 'AI screening is already being processed.' });
     }
-    if (outcome.status === 'pending') {
-      return successResponse(res, { status: 'pending', message: 'AI screening has been queued.' });
-    }
-    // completed / other — nothing to do.
-    return errorResponse(
-      res,
-      409,
-      'SCREENING_NOT_RETRYABLE',
-      `Screening is "${outcome.status}" and cannot be retried.`
-    );
+    return successResponse(res, { status: 'pending', message: 'AI screening has been queued.' });
   } catch (err) {
     if (err && err.isScreeningError) {
       return errorResponse(res, 404, 'SCREENING_NOT_FOUND', 'No screening exists for this application yet.');
@@ -103,4 +101,46 @@ async function retryApplicationScreening(req, res) {
   }
 }
 
-module.exports = { getApplicationScreening, retryApplicationScreening, toScreeningView };
+// POST /api/vacancies/:id/screenings/run-pending
+// HR-authorized bulk (re)run for a vacancy: queues every application whose
+// screening is pending / failed / not yet created. Completed ones are left as-is.
+async function runPendingScreenings(req, res) {
+  try {
+    let vacancy;
+    try {
+      vacancy = await vacancyService.getVacancyForUser(req.params.id, req.user.id);
+    } catch (err) {
+      if (err && err.isVacancyError && err.code === 'FORBIDDEN') {
+        return errorResponse(res, 404, 'VACANCY_NOT_FOUND', 'This vacancy could not be found.');
+      }
+      throw err;
+    }
+    if (!vacancy) {
+      return errorResponse(res, 404, 'VACANCY_NOT_FOUND', 'This vacancy could not be found.');
+    }
+
+    if (!isScreeningConfigured()) {
+      return errorResponse(res, 503, 'SCREENING_UNAVAILABLE', 'AI screening is not configured on the server.');
+    }
+
+    const { queued, total } = await screeningService.runPendingScreeningsForVacancy(vacancy.id);
+    return successResponse(res, {
+      queued,
+      total,
+      message:
+        queued === 0
+          ? 'No screenings needed running.'
+          : `Queued AI screening for ${queued} application${queued === 1 ? '' : 's'}.`,
+    });
+  } catch (err) {
+    console.error('runPendingScreenings failed:', err.message);
+    return errorResponse(res, 500, 'INTERNAL_ERROR', 'Something went wrong. Please try again.');
+  }
+}
+
+module.exports = {
+  getApplicationScreening,
+  retryApplicationScreening,
+  runPendingScreenings,
+  toScreeningView,
+};

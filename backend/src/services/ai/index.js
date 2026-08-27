@@ -1,5 +1,6 @@
 const { AI_PROVIDER } = require('../../config/aiOptions');
 const { AIProviderError, AI_ERROR } = require('./errors');
+const { createGroqProvider } = require('./groqProvider');
 const { createAnthropicProvider } = require('./anthropicProvider');
 
 // AI provider factory.
@@ -15,14 +16,14 @@ const { createAnthropicProvider } = require('./anthropicProvider');
 
 function getAIProvider() {
   switch (AI_PROVIDER) {
+    case 'groq':
+      return createGroqProvider();
     case 'anthropic':
       return createAnthropicProvider();
-    // case 'openai':
-    //   return createOpenAIProvider();
     default:
       throw new AIProviderError(
         AI_ERROR.NOT_CONFIGURED,
-        `Unknown AI_PROVIDER "${AI_PROVIDER}". Supported: anthropic.`
+        `Unknown AI_PROVIDER "${AI_PROVIDER}". Supported: groq, anthropic.`
       );
   }
 }

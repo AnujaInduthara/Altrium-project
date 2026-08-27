@@ -387,8 +387,9 @@ recruitment decision (PB-06/07).
 > [`backend/sql/005_create_application_screenings.sql`](backend/sql/005_create_application_screenings.sql)
 > after `004`.
 >
-> **AI key optional:** with no `ANTHROPIC_API_KEY` set, screening rows are
-> created as `pending` and the pipeline is inert — PB-01…PB-04 are unaffected.
+> **AI key optional:** with no `GROQ_API_KEY` set (for the default `groq`
+> provider), screening rows are created as `pending` and the pipeline is inert —
+> PB-01…PB-04 are unaffected.
 
 ### Flow
 
@@ -408,7 +409,7 @@ download CV from the private bucket (service role)  ->  extract text (PDF: pdf-p
 build a vacancy-specific prompt   (CV wrapped as UNTRUSTED DATA, delimiters neutralized)
       |
       v
-AI provider  (services/ai — provider abstraction; Anthropic impl; bounded retries + backoff)
+AI provider  (services/ai — provider abstraction; Groq (default) + Anthropic impls; bounded retries + backoff)
       |
       v
 validate structured JSON  (0<=score<=100, enums, array types, string caps; reject 120 / "ninety")
@@ -442,7 +443,10 @@ cannot express a hiring decision.
 |---|---|
 | `GET /api/vacancies/:id/applications` | unchanged shape + each application now carries a `screening` object (`status`, `score`, `recommendation`, `matched_skills`, `missing_skills`, `summary`, `ai_screening_rank`, `processed_at`, …). |
 | `GET /api/applications/:id/screening` | HR only, owner-checked; the full screening result for one application. `{ screening: { status: "not_started" } }` if it has not run. |
-| `POST /api/applications/:id/screening/retry` | HR only, owner-checked; re-queues a screening that previously **failed**. There is **no** endpoint that lets a client trigger screening for an arbitrary application — it is a system function. |
+| `POST /api/applications/:id/screening/retry` | HR only, owner-checked; (re)queues one application's screening — covers **failed**, still-**pending** (e.g. submitted before the AI key was set), and re-running a **completed** one. `503 SCREENING_UNAVAILABLE` if no provider key is configured. |
+| `POST /api/vacancies/:id/screenings/run-pending` | HR only, owner-checked; bulk-queues every application under the vacancy whose screening has not completed. Returns `{ queued, total }`. Backs the "Run pending screenings" button on the AI Screening page. |
+
+Initial screening is still automatic and fire-and-forget after an application is stored; these endpoints only let HR re-drive it. Results surface both inline on **Applications** and, ranked by score, on the dedicated **AI Screening** page (`ai-screening.html`).
 
 ### Security
 
@@ -500,9 +504,10 @@ The rest are optional:
 | `CORS_ALLOW_ANY`             | *(optional)* `true` reflects every origin — only behind a trusted proxy |
 | `APP_URL`                    | *(optional)* fallback base URL for the application link when a request has no `Origin` header |
 | `CV_MAX_BYTES`               | *(optional)* max CV upload size in bytes; defaults to `5242880` (5 MiB)     |
-| `AI_PROVIDER`                | *(PB-05)* AI provider for CV screening; currently `anthropic` (default)     |
-| `AI_MODEL`                   | *(PB-05)* provider model id; default `claude-opus-5`                        |
-| `ANTHROPIC_API_KEY`          | *(PB-05)* **server-only secret**. Leave blank to keep AI screening inactive (rows stay `pending`) |
+| `AI_PROVIDER`                | *(PB-05)* AI provider for CV screening; `groq` (default) or `anthropic`     |
+| `AI_MODEL`                   | *(PB-05)* provider model id; default `openai/gpt-oss-120b` (Groq)           |
+| `GROQ_API_KEY`               | *(PB-05)* **server-only secret** for the default `groq` provider. Leave blank to keep AI screening inactive (rows stay `pending`) |
+| `ANTHROPIC_API_KEY`          | *(PB-05)* **server-only secret**, only when `AI_PROVIDER=anthropic`        |
 | `AI_EFFORT` / `AI_MAX_OUTPUT_TOKENS` / `AI_REQUEST_TIMEOUT_MS` / `AI_TEMPERATURE` / `AI_SCORE_WEIGHTS` / `AI_SCREENING_ENABLED` | *(PB-05, optional)* screening tuning — see `.env.example` |
 
 Run:
