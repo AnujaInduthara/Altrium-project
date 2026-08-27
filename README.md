@@ -334,6 +334,45 @@ sync with the bucket's `file_size_limit` and `frontend/js/config.js`
 `cd backend && npm test` runs `backend/test/applicationValidation.test.js`
 (Node's built-in test runner) — field validation and CV magic-byte checks.
 
+## PB-04 (partial): HR reviews applications
+
+An HR user opens **Applications** in the sidebar, picks one of their vacancies,
+and sees the CV applications submitted to it — applicant name, email, phone,
+location, submission date and reference — with a **View CV** action. AI
+screening, status changes and candidate selection are still later backlog items;
+this is only the review list + CV access.
+
+### Flow
+
+```
+Applications (applications.html)  — or  Vacancy details -> "View applications"
+      |  pick a vacancy
+      v
+GET /api/vacancies/:id/applications      Authorization: Bearer <access_token>
+      |  authenticateUser -> requireHR -> getVacancyForUser (owner check)
+      v
+{ vacancy: {...}, applications: [ { reference, full_name, email, phone,
+  location, status, cv_original_name, cv_size_bytes, cv_content_type,
+  created_at }, ... ] }        (never cv_path)
+      |
+      |  "View CV"
+      v
+GET /api/applications/:id/cv             Authorization: Bearer <access_token>
+      |  owner-checked via the parent vacancy
+      v
+{ url: "<signed URL, 120s>", file_name, content_type }   -> opened in a new tab
+```
+
+### API
+
+| endpoint | notes |
+|---|---|
+| `GET /api/vacancies/:id/applications` | HR only; `403` if the vacancy belongs to another HR user, `404` if unknown. Returns public-safe applicant fields only. |
+| `GET /api/applications/:id/cv` | HR only; `404` (not `403`) if the application belongs to another HR user's vacancy, so nothing leaks. Returns a **short-lived signed URL** (120s) into the private `candidate-cvs` bucket — the CV is never served through a public URL or a raw storage key. |
+
+No schema or storage changes — this reads the `applications` table and bucket
+created by migration `004`.
+
 ## Project structure
 
 ```
@@ -443,8 +482,9 @@ There is nothing machine-specific to change:
 ## Remaining Sprint 1 work
 
 Done: Step 0 (HR Login), PB-01 (Create Job Vacancy — draft), PB-02 (Publish
-Vacancy — public link generated), PB-03 (Applicant submits a CV application).
+Vacancy — public link generated), PB-03 (Applicant submits a CV application),
+PB-04 partial (HR reviews the application list + opens CVs).
 
-Not yet implemented: PB-04 application storage/listing for HR, PB-05 AI CV
-screening, PB-06 applicant review, PB-07 candidate selection, PB-08 vacancy
-closing.
+Not yet implemented: PB-05 AI CV screening, PB-06 AI-filtered applicant review,
+PB-07 candidate selection, PB-08 vacancy closing. Application `status` stays
+`submitted` — no transitions yet.

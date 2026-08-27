@@ -20,6 +20,7 @@ frontend/
 ├── vacancies.html        Job Vacancies list (PB-01) — cards link to the details page
 ├── create-vacancy.html   Create New Vacancy form (PB-01) — saves a DRAFT
 ├── vacancy.html          Vacancy details + Publish action (PB-02)
+├── applications.html     HR application review (PB-04) — pick a vacancy, see applicants, view CVs
 ├── apply.html            Public application page (PB-03) — view vacancy + submit a CV application, no auth
 │
 ├── assets/
@@ -66,6 +67,7 @@ frontend/
     ├── services/
     │   ├── authService.js       Auth + HR-authorization API (no DOM).
     │   ├── vacancyService.js    Vacancy API (create / list / get / publish), bearer token.
+    │   ├── applicationService.js  HR review API — list a vacancy's applications, get a CV link.
     │   └── publicVacancyService.js  Unauthenticated published-vacancy lookup + application submission.
     ├── utils/
     │   ├── validators.js        Pure form-validation helpers.
@@ -87,7 +89,8 @@ frontend/
         ├── vacanciesPage.js
         ├── createVacancyPage.js
         ├── vacancyPage.js       Details + publish flow (PB-02).
-        └── applyPage.js         Public application page (PB-02).
+        ├── applicationsPage.js  HR review — pick a vacancy, see applicants, view CVs.
+        └── applyPage.js         Public application page (PB-03).
 ```
 
 ## The app shell (common header + sidebar)

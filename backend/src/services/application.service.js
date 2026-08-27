@@ -139,4 +139,73 @@ async function createApplication({ vacancy, input, cv }) {
   return { reference: created.reference, job_title: vacancy.job_title };
 }
 
-module.exports = { createApplication, ApplicationError };
+// ---------------------------------------------------------------------------
+// HR review (list applications for a vacancy, open a CV).
+// ---------------------------------------------------------------------------
+
+// Columns safe to return to the HR user who owns the vacancy. `cv_path` is
+// deliberately NOT here — the CV is only reachable through a short-lived signed
+// URL minted by createCvSignedUrl, never as a raw storage key.
+const APPLICATION_HR_FIELDS = [
+  'id',
+  'reference',
+  'full_name',
+  'email',
+  'phone',
+  'location',
+  'status',
+  'cv_original_name',
+  'cv_size_bytes',
+  'cv_content_type',
+  'created_at',
+].join(', ');
+
+// All applications for one vacancy, newest first. The caller (controller) must
+// have already confirmed the vacancy belongs to the requesting HR user.
+async function listApplicationsForVacancy(vacancyId) {
+  const { data, error } = await supabaseAdmin
+    .from('applications')
+    .select(APPLICATION_HR_FIELDS)
+    .eq('vacancy_id', vacancyId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw wrapDbError('Failed to list applications', error);
+  return data || [];
+}
+
+// One application incl. its `vacancy_id` and `cv_path` for the ownership check +
+// signed-URL step. Returns null for an unknown / malformed id.
+async function getApplicationById(applicationId) {
+  const { data, error } = await supabaseAdmin
+    .from('applications')
+    .select(`${APPLICATION_HR_FIELDS}, vacancy_id, cv_path`)
+    .eq('id', applicationId)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '22P02') return null; // invalid uuid -> treat as not found
+    throw wrapDbError('Failed to load application', error);
+  }
+  return data || null;
+}
+
+// Short-lived signed URL for a CV in the private bucket. Default 120s — long
+// enough to open, short enough that a leaked URL is near-useless.
+async function createCvSignedUrl(cvPath, expiresIn = 120) {
+  const { data, error } = await supabaseAdmin.storage
+    .from(CV_BUCKET)
+    .createSignedUrl(cvPath, expiresIn);
+
+  if (error || !data || !data.signedUrl) {
+    throw wrapDbError('Failed to create a CV link', error || new Error('no signed url returned'));
+  }
+  return { url: data.signedUrl, expiresIn };
+}
+
+module.exports = {
+  createApplication,
+  listApplicationsForVacancy,
+  getApplicationById,
+  createCvSignedUrl,
+  ApplicationError,
+};

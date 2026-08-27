@@ -7,6 +7,7 @@ const { isAllowedOrigin } = require('./config/cors');
 const authRoutes = require('./routes/auth.routes');
 const hrRoutes = require('./routes/hr.routes');
 const vacancyRoutes = require('./routes/vacancy.routes');
+const applicationRoutes = require('./routes/application.routes');
 const publicRoutes = require('./routes/public.routes');
 const { notFoundHandler, errorHandler } = require('./middleware/error.middleware');
 
@@ -29,6 +30,7 @@ app.use(express.json({ limit: '100kb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/vacancies', vacancyRoutes);
+app.use('/api/applications', applicationRoutes);
 app.use('/api/public', publicRoutes);
 
 app.use(notFoundHandler);
