@@ -18,8 +18,8 @@ frontend/
 ├── login.html            Split-screen login page
 ├── dashboard.html        Protected HR dashboard placeholder
 ├── vacancies.html        Job Vacancies list (PB-01) — cards link to the details page
-├── create-vacancy.html   Create New Vacancy form (PB-01) — saves a DRAFT
-├── vacancy.html          Vacancy details + Publish action (PB-02)
+├── create-vacancy.html   Create Job Vacancy form (PB-01) — saves a DRAFT
+├── vacancy.html          Publish Job Vacancy — review details + publish action (PB-02)
 ├── applications.html     HR application review (PB-04) — pick a vacancy, see applicants, view CVs
 ├── apply.html            Public application page (PB-03) — view vacancy + submit a CV application, no auth
 │

@@ -1,18 +1,43 @@
 /* ============================================================================
-   AI Screening page — HR sees a vacancy's applicants ranked by AI CV-match
-   score. Advisory only; reuses the shared card / field / badge / button parts.
+   AI Screening Results — HR sees a vacancy's applicants in a results table,
+   ranked by AI CV-match score. Advisory only.
    ========================================================================== */
+
+/* Consistent vertical rhythm between the stacked blocks (toolbar card, the
+   vacancy sub-header, the results card, empty states…). Hidden blocks are
+   display:none and contribute no gap. */
+#screening-page:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+#screening-page > .page-header {
+  margin-bottom: 0;
+}
 
 .screening-toolbar {
   display: flex;
   align-items: flex-end;
   gap: var(--space-4);
   flex-wrap: wrap;
+  padding: var(--space-5);
 }
 
 .screening-toolbar__field {
-  flex: 1;
-  min-width: 16rem;
+  min-width: 0;
+}
+
+.screening-toolbar > [data-field="vacancy"] {
+  flex: 2 1 14rem;
+}
+
+.screening-toolbar__field--sm {
+  flex: 0 1 10rem;
+}
+
+.screening-toolbar__search {
+  flex: 1 1 12rem;
 }
 
 .screening-toolbar__run {
@@ -20,25 +45,16 @@
 }
 
 .screening-vacancy {
-  font-size: var(--text-sm);
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: 700;
   color: var(--color-text);
-  margin-top: calc(-1 * var(--space-2));
+  margin-bottom: calc(-1 * var(--space-3));
 }
 
 .screening-summary {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-4);
-  margin-top: calc(-1 * var(--space-2));
-}
-
-.screening-foot-note {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
 }
 
 .screening-summary__item {
@@ -55,94 +71,118 @@
   color: var(--color-danger);
 }
 
-.screening-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--space-3);
-  counter-reset: none;
+/* Results table ---------------------------------------------------------- */
+
+.table-scroll {
+  overflow-x: auto;
 }
 
-.screening-card {
-  display: grid;
-  grid-template-columns: 3rem minmax(0, 1fr) auto;
-  gap: var(--space-4);
-  align-items: start;
+.screening-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
 }
 
-.screening-card__rank {
-  font-size: var(--text-xl);
-  font-weight: 800;
-  color: var(--color-primary);
-  text-align: center;
-  padding-top: 0.1rem;
-}
-
-.screening-card__rank--empty::before {
-  content: "·";
-  color: var(--color-text-subtle);
-}
-
-.screening-card__main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.screening-card__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.screening-card__name {
-  font-size: var(--text-lg);
+.screening-table th {
+  text-align: left;
+  padding: 0 var(--space-4) var(--space-3);
+  font-size: var(--text-xs);
   font-weight: 700;
-  overflow-wrap: anywhere;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-subtle);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--color-border);
 }
 
-.screening-card__status {
-  flex-shrink: 0;
-}
-
-.screening-card__scoreline {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.screening-card__score {
-  font-size: var(--text-xl);
-  font-weight: 800;
+.screening-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
   color: var(--color-text);
 }
 
-.screening-card__score-max {
-  font-size: var(--text-sm);
+.screening-table th:first-child,
+.screening-table td:first-child {
+  padding-left: 0;
+}
+
+.screening-table th:last-child,
+.screening-table td:last-child {
+  padding-right: 0;
+}
+
+.screening-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.screening-table__num {
+  text-align: center;
+  width: 3.5rem;
+}
+
+.screening-row {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.screening-row:hover td {
+  background: var(--color-surface-muted);
+}
+
+.screening-row__candidate {
+  min-width: 9rem;
+}
+
+.screening-row__name {
+  display: block;
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.screening-row__name:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+.screening-row__ref {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs);
   color: var(--color-text-subtle);
 }
 
-.screening-card__rec {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-primary);
-  margin-left: 0.3rem;
+/* Match Score cell */
+
+.screening-row__score {
+  width: 12rem;
 }
 
-.screening-card__meter {
+.score-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.score-cell__value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 2.75rem;
+}
+
+.score-cell__bar {
   position: relative;
+  flex: none;
+  width: 6rem;
   height: 6px;
   border-radius: var(--radius-pill);
   background: var(--color-surface-muted);
   overflow: hidden;
-  max-width: 22rem;
 }
 
-.screening-card__meter-fill {
+.score-cell__fill {
   display: block;
   height: 100%;
   border-radius: inherit;
@@ -150,63 +190,70 @@
   transition: width var(--transition-fast);
 }
 
-.screening-card__meter-fill[data-band="high"] { background: var(--color-success); }
-.screening-card__meter-fill[data-band="mid"]  { background: var(--color-primary); }
-.screening-card__meter-fill[data-band="low"]  { background: var(--color-border-strong); }
+.score-cell__fill[data-band="high"] { background: var(--color-success); }
+.score-cell__fill[data-band="mid"]  { background: var(--color-warning); }
+.score-cell__fill[data-band="low"]  { background: var(--color-danger); }
 
-.screening-card__matches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem var(--space-4);
+.screening-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
   font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.screening-chip--warn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.linkbtn {
+  margin-left: var(--space-2);
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-primary-hover);
+  cursor: pointer;
+}
+
+.linkbtn:hover {
+  text-decoration: underline;
+}
+
+.linkbtn:disabled {
+  color: var(--color-text-subtle);
+  cursor: default;
+  text-decoration: none;
+}
+
+/* Skills Match cell */
+
+.skills-match {
   font-weight: 600;
   color: var(--color-text-muted);
 }
 
-.screening-card__summary {
-  font-size: var(--text-sm);
-  color: var(--color-text);
-  margin: 0;
-}
+.skills-match[data-band="excellent"],
+.skills-match[data-band="good"] { color: var(--color-success); }
+.skills-match[data-band="ok"]   { color: var(--color-text); }
+.skills-match[data-band="low"]  { color: var(--color-warning); }
+.skills-match[data-band="none"] { color: var(--color-text-subtle); }
 
-.screening-card__skills {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.screening-card__skills-label {
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-subtle);
-}
-
-.screening-card__note {
+.screening-note {
+  margin-top: var(--space-5);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
-  margin: 0;
-}
-
-.screening-card__actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: stretch;
 }
 
 @media (max-width: 640px) {
-  .screening-card {
-    grid-template-columns: 2.25rem minmax(0, 1fr);
-  }
-
-  .screening-card__actions {
-    grid-column: 1 / -1;
-    flex-direction: row;
-    justify-content: flex-end;
-    border-top: 1px solid var(--color-border);
-    padding-top: var(--space-3);
+  .screening-toolbar__field--sm,
+  .screening-toolbar__search {
+    flex: 1 1 100%;
   }
 }
