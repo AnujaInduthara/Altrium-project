@@ -97,4 +97,16 @@ async function publishVacancy(req, res) {
   }
 }
 
-module.exports = { createVacancy, listVacancies, getVacancy, publishVacancy };
+// POST /api/vacancies/:id/close — PUBLISHED -> CLOSED. No request body: the
+// endpoint itself is the action, and the server controls status / closed_at /
+// closed_by. Idempotency and valid-transition enforcement live in the service.
+async function closeVacancy(req, res) {
+  try {
+    const vacancy = await vacancyService.closeVacancy(req.params.id, req.user.id);
+    return successResponse(res, withPublicUrl(vacancy, req.get('origin')));
+  } catch (err) {
+    return handleError(res, err, 'closeVacancy');
+  }
+}
+
+module.exports = { createVacancy, listVacancies, getVacancy, publishVacancy, closeVacancy };

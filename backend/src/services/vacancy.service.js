@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const { supabaseAdmin } = require('../config/supabase');
 const { VACANCY_STATUS } = require('../config/vacancyOptions');
 const { validateVacancyInput } = require('../utils/vacancyValidation');
+const { evaluateCloseTransition } = require('../utils/vacancyClosure');
 
 // Columns returned to the API layer. No secrets here, but we still list
 // columns explicitly rather than select('*') so the shape is deliberate.
@@ -19,6 +20,8 @@ const RETURNING = [
   'created_by',
   'public_token',
   'published_at',
+  'closed_at',
+  'closed_by',
   'created_at',
   'updated_at',
 ].join(', ');
@@ -193,10 +196,66 @@ async function publishVacancy(id, authUserId) {
   throw new VacancyError('VACANCY_PUBLISH_FAILED', 500, 'Unable to publish the vacancy. Please try again.');
 }
 
-// Public, unauthenticated lookup by token. Only ever returns a PUBLISHED
-// vacancy, and only its public-safe fields (never created_by, ids, tokens or
-// audit timestamps). Returns null for anything else.
-async function getPublishedVacancyByToken(token) {
+// PUBLISHED -> CLOSED (PB-08). One-way: a closed vacancy can never be re-opened.
+// Server-controlled and owner-checked. Records who closed it (`closed_by`) and
+// when (`closed_at`, server time — never a client value). Nothing else changes:
+// the public_token is kept so the link stays resolvable, and applications, CVs,
+// AI screening results and selected candidates are untouched.
+async function closeVacancy(id, authUserId) {
+  const vacancy = await fetchVacancyById(id);
+
+  if (!vacancy) {
+    throw new VacancyError('VACANCY_NOT_FOUND', 404, 'This vacancy could not be found.');
+  }
+  if (vacancy.created_by !== authUserId) {
+    throw new VacancyError('FORBIDDEN', 403, 'You do not have permission to close this vacancy.');
+  }
+
+  const decision = evaluateCloseTransition(vacancy.status);
+  if (!decision.allowed) {
+    throw new VacancyError(decision.code, decision.status, decision.message);
+  }
+
+  // Conditional, single-statement update. The `.eq('status', 'published')` guard
+  // makes PUBLISHED -> CLOSED atomic and idempotent: a double-click or a
+  // concurrent request updates zero rows once the vacancy is already closed
+  // rather than re-stamping the audit fields or erroring.
+  const { data, error } = await supabaseAdmin
+    .from('job_vacancies')
+    .update({
+      status: VACANCY_STATUS.CLOSED,
+      closed_at: new Date().toISOString(),
+      closed_by: authUserId,
+    })
+    .eq('id', id)
+    .eq('status', VACANCY_STATUS.PUBLISHED)
+    .select(RETURNING)
+    .maybeSingle();
+
+  if (error) {
+    throw wrapDbError('Failed to close vacancy', error);
+  }
+
+  if (!data) {
+    // No row matched the PUBLISHED guard — a concurrent request already moved it.
+    const current = await fetchVacancyById(id);
+    const recheck = evaluateCloseTransition(current ? current.status : undefined);
+    if (!recheck.allowed) {
+      throw new VacancyError(recheck.code, recheck.status, recheck.message);
+    }
+    throw new VacancyError('VACANCY_CLOSE_FAILED', 500, 'Unable to close the vacancy. Please try again.');
+  }
+
+  return data;
+}
+
+// Public, unauthenticated lookup for the applicant page. Resolves a vacancy by
+// token when it is PUBLISHED **or** CLOSED, returning its public-safe fields
+// plus `status` so the page can show the application form (published) or a
+// "closed" notice (closed). Draft / unknown tokens still return null — nothing
+// about a non-live vacancy leaks. Audit fields (closed_at/closed_by, ids,
+// created_by) are never included.
+async function getPublicVacancyByToken(token) {
   if (!token || typeof token !== 'string') return null;
 
   const { data, error } = await supabaseAdmin
@@ -209,18 +268,25 @@ async function getPublishedVacancyByToken(token) {
     if (error.code === '22P02') return null;
     throw wrapDbError('Failed to load public vacancy', error);
   }
-  if (!data || data.status !== VACANCY_STATUS.PUBLISHED) return null;
+  if (
+    !data ||
+    (data.status !== VACANCY_STATUS.PUBLISHED && data.status !== VACANCY_STATUS.CLOSED)
+  ) {
+    return null;
+  }
 
-  const publicView = {};
+  const publicView = { status: data.status };
   for (const field of PUBLIC_FIELDS) publicView[field] = data[field];
   return publicView;
 }
 
-// Public, unauthenticated lookup used by the PB-03 application submission. Like
-// getPublishedVacancyByToken it only ever resolves a PUBLISHED vacancy, but it
-// returns the internal `id` and `job_title` for the backend's own use (linking
-// the application row, wording the confirmation) — this shape is never sent to
-// the applicant's browser. Returns null for draft / closed / unknown tokens.
+// Public, unauthenticated lookup used by the PB-03 application submission. It
+// only ever resolves a PUBLISHED vacancy — a CLOSED (PB-08), draft or unknown
+// token returns null, so a closed vacancy stops accepting new applications at
+// the server even though its link stays resolvable. Returns the internal `id`
+// and `job_title` for the backend's own use (linking the application row,
+// wording the confirmation) — this shape is never sent to the applicant's
+// browser.
 async function getApplicableVacancyByToken(token) {
   if (!token || typeof token !== 'string') return null;
 
@@ -264,7 +330,8 @@ module.exports = {
   listVacanciesForUser,
   getVacancyForUser,
   publishVacancy,
-  getPublishedVacancyByToken,
+  closeVacancy,
+  getPublicVacancyByToken,
   getApplicableVacancyByToken,
   getVacancyForScreening,
   VacancyError,

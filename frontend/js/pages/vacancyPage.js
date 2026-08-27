@@ -24,10 +24,12 @@ const errorEl = document.getElementById('detail-error');
 const detailEl = document.getElementById('vacancy-detail');
 const alert = createAlert(document.getElementById('detail-alert'));
 const modal = createModal(document.getElementById('publish-modal'));
+const closeModal = createModal(document.getElementById('close-modal'));
 
 const vacancyId = readParam('id');
 
 let publishing = false;
+let closing = false;
 let currentStatus = 'draft';
 
 const $ = (id) => document.getElementById(id);
@@ -82,6 +84,25 @@ function render(vacancy) {
   const isPublished = currentStatus === 'published';
   const isClosed = currentStatus === 'closed';
 
+  // Page heading reflects where the vacancy is in its lifecycle.
+  text(
+    'detail-page-title',
+    isPublished ? 'Job Vacancy' : isClosed ? 'Closed Job Vacancy' : 'Publish Job Vacancy'
+  );
+  text(
+    'detail-page-subtitle',
+    isPublished
+      ? 'This vacancy is live. Share the public application link or close it when hiring is done.'
+      : isClosed
+        ? 'This vacancy is closed. Recruitment data is preserved and remains accessible below.'
+        : 'Review and publish the vacancy to generate a public application link.'
+  );
+
+  // The Draft ↔ Published switch is only meaningful before closing. Once closed,
+  // it is replaced by a plain "Closed" status badge.
+  $('status-toggle-row').hidden = isClosed;
+  $('status-closed-badge').hidden = !isClosed;
+
   // The switch shows the live state and is only interactive on a draft. The
   // "Update to Published" button stays disabled until the user flips it on.
   setToggle(isPublished);
@@ -89,9 +110,27 @@ function render(vacancy) {
   $('publish-btn').hidden = !isDraft;
   $('publish-btn').disabled = true;
 
-  $('published-links').hidden = !isPublished;
+  // Close Vacancy is only offered for a published vacancy; never for a draft
+  // (nothing to close) or an already-closed one. Button visibility is a UX aid
+  // only — the backend independently rejects any invalid transition.
+  $('close-btn').hidden = !isPublished;
+  $('close-btn').disabled = closing;
+
+  // Deep links to the recruitment data stay available while published AND after
+  // closing, so historical applications / screening / candidates remain reachable.
+  const hasRecruitmentData = isPublished || isClosed;
+  $('published-links').hidden = !hasRecruitmentData;
   $('closed-note').hidden = !isClosed;
   $('copy-btn').disabled = !isPublished;
+  // The copyable public link only makes sense while the vacancy is live; a
+  // closed vacancy's link resolves to a "closed" notice, not the form.
+  $('public-link-field').hidden = isClosed;
+
+  if (hasRecruitmentData) {
+    $('view-applications-link').href = withHashParam('applications.html', 'vacancy', vacancy.id);
+    $('view-screening-link').href = withHashParam('ai-screening.html', 'vacancy', vacancy.id);
+    $('select-candidates-link').href = withHashParam('candidates.html', 'vacancy', vacancy.id);
+  }
 
   if (isPublished) {
     $('public-url').value = vacancy.public_url || '';
@@ -99,9 +138,6 @@ function render(vacancy) {
       'published-at-hint',
       vacancy.published_at ? `Published ${formatDateTime(vacancy.published_at)}` : ''
     );
-    $('view-applications-link').href = withHashParam('applications.html', 'vacancy', vacancy.id);
-    $('view-screening-link').href = withHashParam('ai-screening.html', 'vacancy', vacancy.id);
-    $('select-candidates-link').href = withHashParam('candidates.html', 'vacancy', vacancy.id);
     text('publish-panel-subtitle', 'This vacancy is live. Candidates can apply using the link below.');
   } else {
     $('public-url').value = '';
@@ -114,7 +150,13 @@ function render(vacancy) {
     );
   }
 
+  text(
+    'closed-at-hint',
+    isClosed && vacancy.closed_at ? `Closed ${formatDateTime(vacancy.closed_at)}.` : ''
+  );
+
   $('publish-modal-body').textContent = `Are you sure you want to publish “${vacancy.job_title}”?`;
+  $('close-modal-body').textContent = `Are you sure you want to close “${vacancy.job_title}”?`;
 
   loadingEl.hidden = true;
   errorEl.hidden = true;
@@ -201,6 +243,69 @@ async function doPublish() {
   }
 }
 
+// --- Close vacancy (PB-08) ---------------------------------------------------
+
+function setClosing(on) {
+  closing = on;
+  const confirmBtn = $('confirm-close-btn');
+  confirmBtn.disabled = on;
+  confirmBtn.setAttribute('aria-busy', String(on));
+  confirmBtn.querySelector('[data-label]').textContent = on ? 'Closing…' : 'Yes, Close Vacancy';
+  // Prevent a second close attempt from the panel button while one is running.
+  $('close-btn').disabled = on;
+}
+
+function messageForCloseStatus(status, body) {
+  const apiMessage = body?.error?.message;
+  switch (status) {
+    case 403:
+      return apiMessage || 'You do not have permission to close this vacancy.';
+    case 404:
+      return apiMessage || 'This vacancy could not be found.';
+    case 409:
+      return apiMessage || 'This vacancy can no longer be closed.';
+    default:
+      return apiMessage || 'Unable to close the vacancy. Please try again.';
+  }
+}
+
+async function doClose() {
+  if (closing) return;
+  alert.hide();
+  setClosing(true);
+
+  try {
+    const { ok, status, body } = await VacancyService.close(vacancyId);
+
+    if (ok) {
+      closeModal.close();
+      render(body.data);
+      alert.success('Job vacancy closed successfully.');
+      return;
+    }
+
+    if (status === 401) {
+      await AuthService.signOut();
+      window.location.replace(LOGIN_PAGE);
+      return;
+    }
+
+    closeModal.close();
+    alert.error(messageForCloseStatus(status, body));
+
+    // For state conflicts / not-found, reload the true state so the UI is honest
+    // about whether the vacancy is already closed.
+    if (status === 409 || status === 404) {
+      await loadVacancy();
+    }
+  } catch (err) {
+    closeModal.close();
+    alert.error('Unable to close the vacancy. Please check your connection and try again.');
+  } finally {
+    setClosing(false);
+  }
+}
+
 async function copyLink() {
   const url = $('public-url').value;
   if (!url) return;
@@ -263,6 +368,8 @@ function wireOnce() {
   $('status-toggle').addEventListener('click', onToggleClick);
   $('publish-btn').addEventListener('click', () => modal.open());
   $('confirm-publish-btn').addEventListener('click', doPublish);
+  $('close-btn').addEventListener('click', () => closeModal.open());
+  $('confirm-close-btn').addEventListener('click', doClose);
   $('copy-btn').addEventListener('click', copyLink);
 }
 

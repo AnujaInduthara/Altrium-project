@@ -55,6 +55,17 @@
   --_bg: var(--color-surface-muted);
 }
 
+.button--danger {
+  --_bg: var(--color-danger);
+  --_fg: var(--color-primary-contrast);
+  --_border: var(--color-danger);
+}
+
+.button--danger:hover:not(:disabled) {
+  --_bg: #a32c23;
+  --_border: #a32c23;
+}
+
 .button--block {
   width: 100%;
 }

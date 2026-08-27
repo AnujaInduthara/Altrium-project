@@ -21,12 +21,22 @@
 
     <p class="status-message" id="apply-loading" role="status">Loading vacancy…</p>
 
-    <!-- Vacancy not open for applications (unknown / draft / closed token) -->
+    <!-- Vacancy not open for applications (unknown / draft token) -->
     <div class="card apply__card apply__state" id="apply-unavailable" hidden>
       <h1 class="heading-lg">Job vacancy unavailable</h1>
       <p class="text-muted">
         This position is currently not accepting applications. The link may be
         incorrect, or the vacancy may have closed.
+      </p>
+      <p><a class="button button--ghost" href="index.html">Back to Altrium</a></p>
+    </div>
+
+    <!-- Vacancy closed (PB-08): the link still resolves, but no new applications -->
+    <div class="card apply__card apply__state" id="apply-closed" hidden role="status">
+      <h1 class="heading-lg">Job vacancy closed</h1>
+      <p class="text-muted">
+        Applications for this position are no longer being accepted.
+        Thank you for your interest.
       </p>
       <p><a class="button button--ghost" href="index.html">Back to Altrium</a></p>
     </div>
