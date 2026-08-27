@@ -632,6 +632,114 @@ POST /api/vacancies/:id/candidates/select   { applicationIds: [...] }
   (deep-linked to the chosen vacancy). The **Candidates** sidebar item now
   resolves to this page.
 
+## PB-08: HR closes a job vacancy
+
+The **final Sprint-1 step**. When recruitment for a published vacancy no longer
+needs to accept new applications, HR opens it and clicks **Close Vacancy**,
+confirms in a dialog, and the vacancy moves `PUBLISHED → CLOSED`. Closing is a
+one-way workflow state change — **not** a deletion. Every existing application,
+CV, AI screening result and selected candidate is preserved and stays
+accessible to the owning HR user; only *new* public applications are blocked.
+
+> **Migration required:** run
+> [`backend/sql/007_add_vacancy_closing.sql`](backend/sql/007_add_vacancy_closing.sql)
+> after `006`. It adds `closed_at` / `closed_by` to `job_vacancies` plus a
+> `NOT VALID` audit check constraint. `'closed'` has been an allowed `status`
+> since migration `002`, so there is no data migration and existing rows stay
+> valid.
+
+### Flow
+
+```
+Vacancies → open a published vacancy (vacancy.html#id=<uuid>)
+      │  "Close Vacancy" → confirm in a modal
+      ▼
+POST /api/vacancies/:id/close   Authorization: Bearer <access_token>   (no body)
+      │  authenticateUser → requireHR → service:
+      │    exists? → owned by caller? → status == 'published'?
+      │    → conditional UPDATE ... SET status='closed', closed_at=now(),
+      │        closed_by=<hr> WHERE id=:id AND status='published'
+      ▼
+200 { success: true, data: { ..., status: "closed", closed_at, closed_by } }
+      → panel shows a "Closed" badge + "Closed <date>"; recruitment-data links stay
+```
+
+### Database (migration `007`)
+
+Adds to `public.job_vacancies`:
+
+| column | type | notes |
+|---|---|---|
+| `closed_at` | timestamptz | server timestamp of the `PUBLISHED → CLOSED` transition; NULL unless `status = 'closed'` |
+| `closed_by` | uuid | FK → `auth.users(id)`; the HR user who closed it; NULL unless `status = 'closed'` |
+
+Plus a `NOT VALID` check constraint (`job_vacancies_closed_audit`): a `closed`
+row must have both audit fields, a non-`closed` row must have neither. RLS is
+unchanged — closing is backend-only (service role); there is deliberately **no**
+authenticated/anon UPDATE policy, so a leaked browser key cannot change a
+vacancy's status.
+
+### API
+
+**`POST /api/vacancies/:id/close`** — HR only, **no request body**. The server
+controls `status` / `closed_at` / `closed_by`; anything in a body is ignored.
+
+| status | meaning |
+|---|---|
+| `200` | closed — data includes `status: "closed"`, `closed_at`, `closed_by`, and `public_url` (kept — the link stays resolvable) |
+| `401` | missing / invalid / expired token |
+| `403` | authenticated non-HR, **or** the vacancy belongs to another HR user |
+| `404` | `VACANCY_NOT_FOUND` |
+| `409` | `VACANCY_ALREADY_CLOSED` (re-close / idempotent double-click) or `VACANCY_NOT_PUBLISHED` (e.g. still a draft) |
+
+**`GET /api/public/vacancies/:token`** — **unauthenticated**. Now resolves both
+`published` and `closed` vacancies:
+
+| vacancy state | response |
+|---|---|
+| `published` | `200` with public-safe fields + `status: "published"` (the application form is shown) |
+| `closed` | `410 VACANCY_CLOSED` — `apply.html` shows a "Job vacancy closed / applications are no longer being accepted" notice |
+| `draft` / unknown token | plain `404` (nothing about a non-live vacancy leaks) |
+
+**`POST /api/public/vacancies/:token/applications`** — unchanged: only a
+`published` vacancy accepts a submission, so a closed vacancy rejects new
+applications server-side (`404`) even though its link still resolves.
+
+### Security & data integrity
+
+- Server-authorized end to end: `authenticateUser` + `requireHR`, then an
+  explicit "caller owns this vacancy" check (`created_by`). The HR identity and
+  the ownership are **never** taken from the request body / query.
+- The write is one conditional `UPDATE` guarded by `status = 'published'`, so it
+  is atomic and **idempotent**: a double-click / retried request updates zero
+  rows once the vacancy is closed instead of re-stamping the audit fields.
+- `PUBLISHED → CLOSED` is the only transition. `CLOSED → PUBLISHED` /
+  `CLOSED → DRAFT` are impossible (the status-machine rule in
+  `utils/vacancyClosure.js` and the conditional `UPDATE` both enforce it).
+- No cascade, no deletion: applications, CVs (private bucket), screening results
+  and selected candidates are untouched and remain visible to the owning HR user.
+- The `public_token` is kept, so `/apply.html#token=…` stays resolvable — it
+  just renders the closed state.
+
+### Frontend
+
+- `vacancy.html` / `vacancyPage.js` / `css/pages/vacancy.css` — the published
+  panel gains a **Close Vacancy** button (shown only when `status = 'published'`)
+  and an accessible confirmation dialog (reuses the shared `Modal`). After
+  closing, the switch is replaced by a **Closed** badge, a "Closed &lt;date&gt;"
+  note appears, the page heading updates, and the recruitment-data links
+  (applications / AI screening / candidates) stay available.
+- `apply.html` / `applyPage.js` — a new **"Job vacancy closed"** state, shown
+  when the public lookup returns `410`.
+- `vacancyService.close(id)` — wraps `POST /api/vacancies/:id/close`.
+
+### Tests
+
+`cd backend && npm test` also runs `vacancyClosure.test.js` — the
+`PUBLISHED → CLOSED` transition rule (allowed only from `published`; a draft is
+`VACANCY_NOT_PUBLISHED`, an already-closed vacancy is `VACANCY_ALREADY_CLOSED`,
+unknown statuses are never closable).
+
 ## Project structure
 
 ```
@@ -684,6 +792,7 @@ In the Supabase SQL editor, run the migrations in order:
 4. [`backend/sql/004_create_applications.sql`](backend/sql/004_create_applications.sql) — `applications` table + private `candidate-cvs` storage bucket (PB-03).
 5. [`backend/sql/005_create_application_screenings.sql`](backend/sql/005_create_application_screenings.sql) — `application_screenings` table (PB-05 AI CV screening results), RLS with no policies.
 6. [`backend/sql/006_add_candidate_selection.sql`](backend/sql/006_add_candidate_selection.sql) — `selected_at` / `selected_by` audit columns on `applications` + supporting constraint/index (PB-07 candidate selection).
+7. [`backend/sql/007_add_vacancy_closing.sql`](backend/sql/007_add_vacancy_closing.sql) — `closed_at` / `closed_by` audit columns on `job_vacancies` + audit check constraint (PB-08 vacancy closing). `'closed'` was already an allowed `status` value since migration `002`.
 
 There is no self-service HR sign-up. To create your first HR user:
 
@@ -740,25 +849,30 @@ There is nothing machine-specific to change:
 - `profiles` and `job_vacancies` have RLS enabled with per-owner policies; there is no anon policy on either.
 - `applications` has RLS enabled with **no** policies; CVs live in a **private** bucket. Applicant PII and CVs are backend-only.
 - Candidate selection (PB-07) is an HR-only, owner-checked mutation: the acting HR user, the vacancy ownership and every application's vacancy are verified server-side, and the `submitted → selected` write is a single atomic, idempotent statement. AI screening results and CVs are never modified by it.
-- The `DRAFT -> PUBLISHED` transition and the `public_token` are set only by the backend; a request body cannot influence them.
+- Vacancy closing (PB-08) is likewise HR-only and owner-checked: `PUBLISHED → CLOSED` is a single atomic, idempotent conditional `UPDATE`, the only allowed transition, and it never deletes or modifies applications, CVs, screening results or selected candidates. `closed_at` / `closed_by` are server-set.
+- The `DRAFT -> PUBLISHED` / `PUBLISHED -> CLOSED` transitions and the `public_token` are set only by the backend; a request body cannot influence them.
 - The public application link contains only the random token — no internal id, no HR identity.
 - Applicant submissions never touch Supabase directly; the browser only talks to the backend, which validates everything (including the CV bytes).
 - Backend error responses never include stack traces, SQL errors, or Supabase internals.
 - CORS reflects an origin only if it is explicitly configured or is a localhost / private-LAN address; public internet origins are rejected unless added to `CORS_ORIGINS`.
 
-## Remaining Sprint 1 work
+## Sprint 1 status
 
-Done: Step 0 (HR Login), PB-01 (Create Job Vacancy — draft), PB-02 (Publish
-Vacancy — public link generated), PB-03 (Applicant submits a CV application),
-PB-04 partial (HR reviews the application list + opens CVs), PB-05 (AI-assisted
-CV screening — score, recommendation, matched/missing skills, summary stored per
-application; advisory only), PB-06 (HR reviews the AI-filtered applicants —
-ranked AI Screening list + read-only Applicant Review with secure CV access),
-PB-07 (HR selects candidates — explicit, confirmed `submitted → selected`
-transition; the selected applications become candidates for Sprint 2).
+**Sprint 1 complete.** Step 0 (HR Login), PB-01 (Create Job Vacancy — draft),
+PB-02 (Publish Vacancy — public link generated), PB-03 (Applicant submits a CV
+application), PB-04 partial (HR reviews the application list + opens CVs), PB-05
+(AI-assisted CV screening — score, recommendation, matched/missing skills,
+summary stored per application; advisory only), PB-06 (HR reviews the
+AI-filtered applicants — ranked AI Screening list + read-only Applicant Review
+with secure CV access), PB-07 (HR selects candidates — explicit, confirmed
+`submitted → selected` transition), PB-08 (HR closes a job vacancy — one-way
+`PUBLISHED → CLOSED`; recruitment data preserved, new public applications
+blocked).
 
-Not yet implemented: PB-08 vacancy closing. The only HR status transition that
-exists is PB-07's `submitted → selected`; the AI screening pipeline still never
-changes `applications.status`.
+The AI screening pipeline still never changes `applications.status`; the HR
+status transitions are PB-07's `submitted → selected` (applications) and PB-08's
+`published → closed` (vacancies).
+
+Next: **Sprint 2 — Configure Interview Stages.**
 
 

@@ -82,6 +82,15 @@
   color: var(--color-text);
 }
 
+/* "Closed" status pill shown in place of the switch once the vacancy is closed */
+#status-closed-badge {
+  justify-self: start;
+}
+
+.publish-panel__note {
+  line-height: 1.5;
+}
+
 .toggle-row {
   display: flex;
   align-items: center;

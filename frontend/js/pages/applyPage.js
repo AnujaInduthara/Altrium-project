@@ -23,6 +23,7 @@ const TEXT_FIELDS = ['full_name', 'email', 'phone', 'location'];
 const els = {
   loading: $('apply-loading'),
   unavailable: $('apply-unavailable'),
+  closed: $('apply-closed'),
   error: $('apply-error'),
   retry: $('apply-retry'),
   vacancy: $('apply-vacancy'),
@@ -48,12 +49,24 @@ let submitting = false;
 // --- view state ---------------------------------------------------------
 
 function showOnly(...visible) {
-  const all = [els.loading, els.unavailable, els.error, els.vacancy, els.formCard, els.success];
+  const all = [
+    els.loading,
+    els.unavailable,
+    els.closed,
+    els.error,
+    els.vacancy,
+    els.formCard,
+    els.success,
+  ];
   for (const el of all) el.hidden = !visible.includes(el);
 }
 
 function showUnavailable() {
   showOnly(els.unavailable);
+}
+
+function showClosed() {
+  showOnly(els.closed);
 }
 
 function showLoadError() {
@@ -257,9 +270,10 @@ async function handleSubmit(event) {
       showFieldErrors(body.error.fields);
     }
     if (status === 404) {
-      // The vacancy closed between load and submit — send the applicant to the
-      // unavailable state rather than leaving a dead form.
-      showUnavailable();
+      // The vacancy stopped accepting applications between load and submit —
+      // re-resolve it so the applicant sees the accurate state (a closed
+      // vacancy shows the "closed" notice; an unknown one shows "unavailable").
+      loadVacancy();
       return;
     }
 
@@ -288,6 +302,11 @@ async function loadVacancy() {
     const { ok, status, body } = await fetchPublicVacancy(token);
     if (ok && body && body.data) {
       renderVacancy(body.data);
+      return;
+    }
+    if (status === 410) {
+      // PB-08: the vacancy exists but has been closed to new applications.
+      showClosed();
       return;
     }
     if (status === 404) {

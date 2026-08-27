@@ -7,14 +7,27 @@ const {
 } = require('../utils/applicationValidation');
 
 // GET /api/public/vacancies/:token
-// Unauthenticated. Resolves a PUBLISHED vacancy by its public token and returns
-// only public-safe fields. Draft / closed / unknown tokens all get a plain 404
-// so nothing about non-published vacancies leaks.
+// Unauthenticated. Resolves the vacancy behind a public token and returns only
+// public-safe fields.
+//   * PUBLISHED -> 200 with the vacancy (the application form is shown).
+//   * CLOSED    -> 410 VACANCY_CLOSED (PB-08: the link stays resolvable, but
+//                  the applicant sees a "no longer accepting applications" state
+//                  instead of the form).
+//   * DRAFT / unknown token -> plain 404, so nothing about a non-live vacancy
+//                  leaks.
 async function getPublishedVacancy(req, res) {
   try {
-    const vacancy = await vacancyService.getPublishedVacancyByToken(req.params.token);
+    const vacancy = await vacancyService.getPublicVacancyByToken(req.params.token);
     if (!vacancy) {
       return errorResponse(res, 404, 'VACANCY_NOT_FOUND', 'This job vacancy is not available.');
+    }
+    if (vacancy.status === 'closed') {
+      return errorResponse(
+        res,
+        410,
+        'VACANCY_CLOSED',
+        'Applications for this position are no longer being accepted.'
+      );
     }
     return successResponse(res, vacancy);
   } catch (err) {

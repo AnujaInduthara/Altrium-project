@@ -29,8 +29,8 @@
 
       <div id="vacancy-detail" hidden>
         <header class="page-header">
-          <h1 class="page-header__title">Publish Job Vacancy</h1>
-          <p class="page-header__subtitle">
+          <h1 class="page-header__title" id="detail-page-title">Publish Job Vacancy</h1>
+          <p class="page-header__subtitle" id="detail-page-subtitle">
             Review and publish the vacancy to generate a public application link.
           </p>
         </header>
@@ -83,7 +83,7 @@
 
             <div class="publish-status">
               <span class="publish-status__label">Status</span>
-              <div class="toggle-row">
+              <div class="toggle-row" id="status-toggle-row">
                 <span class="toggle-row__side">Draft</span>
                 <button
                   type="button"
@@ -97,9 +97,10 @@
                 </button>
                 <span class="toggle-row__side">Published</span>
               </div>
+              <span class="badge badge--closed" id="status-closed-badge" hidden>Closed</span>
             </div>
 
-            <div class="publish-field">
+            <div class="publish-field" id="public-link-field">
               <label class="field__label" for="public-url">Public Application Link</label>
               <div class="copy-row">
                 <input
@@ -120,6 +121,13 @@
               <span data-label>Update to Published</span>
             </button>
 
+            <p class="text-muted text-sm publish-panel__note" id="closed-note" hidden>
+              This vacancy is closed. New applications are no longer accepted;
+              existing applications, CVs, AI screening results and selected
+              candidates remain available below.
+              <span id="closed-at-hint"></span>
+            </p>
+
             <p class="publish-panel__links" id="published-links" hidden>
               <a class="button button--ghost" id="view-applications-link" href="applications.html">
                 View applications
@@ -132,9 +140,14 @@
               </a>
             </p>
 
-            <p class="text-muted text-sm" id="closed-note" hidden>
-              This vacancy is closed and cannot be published.
-            </p>
+            <button
+              type="button"
+              class="button button--danger publish-panel__cta"
+              id="close-btn"
+              hidden
+            >
+              <span data-label>Close Vacancy</span>
+            </button>
           </aside>
         </div>
       </div>
@@ -155,6 +168,27 @@
         <button type="button" class="button button--ghost" data-close>Cancel</button>
         <button type="button" class="button button--primary" id="confirm-publish-btn" data-autofocus>
           <span data-label>Publish Vacancy</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Close confirmation (PB-08) -->
+  <div class="modal" id="close-modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__dialog" role="dialog" aria-modal="true"
+      aria-labelledby="close-modal-title" aria-describedby="close-modal-desc">
+      <h2 class="modal__title" id="close-modal-title">Close job vacancy?</h2>
+      <p class="modal__body" id="close-modal-body"></p>
+      <p class="modal__body text-sm text-muted" id="close-modal-desc">
+        New applications will no longer be accepted. Existing applications, CVs,
+        AI screening results and selected candidates will remain available. This
+        cannot be undone.
+      </p>
+      <div class="modal__actions">
+        <button type="button" class="button button--ghost" data-close>Cancel</button>
+        <button type="button" class="button button--danger" id="confirm-close-btn" data-autofocus>
+          <span data-label>Yes, Close Vacancy</span>
         </button>
       </div>
     </div>
