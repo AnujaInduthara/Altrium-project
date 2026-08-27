@@ -350,17 +350,20 @@ cd backend
 npm install
 ```
 
-Copy `backend/.env` and fill in:
+Copy `backend/.env.example` to `backend/.env` and fill in the Supabase values.
+The rest are optional:
 
 | Variable                    | Where to find it                                      |
 |------------------------------|--------------------------------------------------------|
 | `PORT`                       | Any free port, default `5000`                          |
-| `FRONTEND_URL`                | Origin of your local static server, e.g. `http://127.0.0.1:5500` |
-| `APP_URL`                     | Public base URL for the application link; usually same as `FRONTEND_URL`. Defaults to `FRONTEND_URL` if unset |
-| `SUPABASE_URL`                | Supabase Dashboard > Project Settings > API             |
-| `SUPABASE_ANON_KEY`           | Supabase Dashboard > Project Settings > API             |
-| `SUPABASE_SERVICE_ROLE_KEY`   | Supabase Dashboard > Project Settings > API (**server-only, never commit**) |
-| `CV_MAX_BYTES`                | *(optional)* max CV upload size in bytes; defaults to `5242880` (5 MiB)     |
+| `SUPABASE_URL`               | Supabase Dashboard > Project Settings > API             |
+| `SUPABASE_ANON_KEY`          | Supabase Dashboard > Project Settings > API             |
+| `SUPABASE_SERVICE_ROLE_KEY`  | Supabase Dashboard > Project Settings > API (**server-only, never commit**) |
+| `FRONTEND_URL`               | *(optional)* frontend origin; localhost + private-LAN origins are allowed automatically |
+| `CORS_ORIGINS`               | *(optional)* extra allowed browser origins, comma-separated (e.g. a deployed URL) |
+| `CORS_ALLOW_ANY`             | *(optional)* `true` reflects every origin — only behind a trusted proxy |
+| `APP_URL`                    | *(optional)* fallback base URL for the application link when a request has no `Origin` header |
+| `CV_MAX_BYTES`               | *(optional)* max CV upload size in bytes; defaults to `5242880` (5 MiB)     |
 
 Run:
 
@@ -389,27 +392,40 @@ There is no self-service HR sign-up. To create your first HR user:
 ### 3. Frontend
 
 `frontend/js/config.js` holds the public (browser-safe) Supabase URL and anon
-key — fill in the same two values from the table above:
+key — fill in the same two values from the table above. You do **not** need to
+set an API URL: the frontend calls the backend on **the same host that served
+the page, port 5000**, so it works from `localhost`, `127.0.0.1` or the
+machine's LAN IP with no edits.
 
-```js
-export const APP_CONFIG = {
-  SUPABASE_URL: 'YOUR_SUPABASE_PROJECT_URL',
-  SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY',
-  API_BASE_URL: 'http://localhost:5000/api',
-};
-```
-
-See [`frontend/README.md`](frontend/README.md) for the full folder layout and
-conventions.
-
-Serve the `frontend/` folder with any static file server, matching the port
-you set as `FRONTEND_URL` in the backend `.env`. For example:
+Serve the `frontend/` folder with any static file server. For example:
 
 ```
 npx serve frontend -l 5500
 ```
 
-or use the VS Code "Live Server" extension. Then open `http://127.0.0.1:5500/login.html`.
+or use the VS Code "Live Server" extension. Then open
+`http://localhost:5500/login.html` (or `http://<your-lan-ip>:5500/login.html`).
+
+See [`frontend/README.md`](frontend/README.md) for the full folder layout and
+conventions.
+
+### Runs on any laptop
+
+There is nothing machine-specific to change:
+
+- **CORS** — the backend allows `localhost`, `127.0.0.1` and private-LAN origins
+  (`192.168.x.x`, `10.x.x.x`, `172.16–31.x.x`) on any port automatically
+  (`backend/src/config/cors.js`). Set `CORS_ORIGINS` (comma-separated) only to
+  add a non-local origin such as a deployed URL.
+- **API URL** — resolved from `window.location` at runtime. Override with
+  `?apiBase=http://host:5000/api` in the URL (remembered afterwards) or
+  `window.__ALTRIUM_API_BASE__` if the backend runs on a different host/port.
+- **Public application link** — built from the HR user's own browser origin, so
+  the copied `apply.html#token=…` link points at the host they are using.
+
+> **Getting a CORS error?** Restart the backend after editing `backend/.env`,
+> and make sure the API request and the page use hosts that resolve to the same
+> machine (both `localhost`, or both the LAN IP — not one of each).
 
 ## Security notes
 
@@ -422,6 +438,7 @@ or use the VS Code "Live Server" extension. Then open `http://127.0.0.1:5500/log
 - The public application link contains only the random token — no internal id, no HR identity.
 - Applicant submissions never touch Supabase directly; the browser only talks to the backend, which validates everything (including the CV bytes).
 - Backend error responses never include stack traces, SQL errors, or Supabase internals.
+- CORS reflects an origin only if it is explicitly configured or is a localhost / private-LAN address; public internet origins are rejected unless added to `CORS_ORIGINS`.
 
 ## Remaining Sprint 1 work
 
