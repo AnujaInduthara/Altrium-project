@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
   <title>Apply — Altrium</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,40 +15,183 @@
 </head>
 <body>
   <main class="apply">
-    <a class="brand apply__brand" href="index.html">
+    <a class="brand apply__brand" href="index.html" aria-label="Altrium home">
       <img class="brand__logo" src="assets/icons/altrium-logo.png" alt="Altrium" />
     </a>
 
-    <p class="status-message" id="apply-loading">Loading vacancy…</p>
+    <p class="status-message" id="apply-loading" role="status">Loading vacancy…</p>
 
-    <div class="card apply__card" id="apply-unavailable" hidden>
-      <h1 class="heading-lg">This job vacancy is not available</h1>
+    <!-- Vacancy not open for applications (unknown / draft token) -->
+    <div class="card apply__card apply__state" id="apply-unavailable" hidden>
+      <h1 class="heading-lg">Job vacancy unavailable</h1>
       <p class="text-muted">
-        The link may be incorrect, or the vacancy is no longer open for
-        applications.
+        This position is currently not accepting applications. The link may be
+        incorrect, or the vacancy may have closed.
+      </p>
+      <p><a class="button button--ghost" href="index.html">Back to Altrium</a></p>
+    </div>
+
+    <!-- Vacancy closed (PB-08): the link still resolves, but no new applications -->
+    <div class="card apply__card apply__state" id="apply-closed" hidden role="status">
+      <h1 class="heading-lg">Job vacancy closed</h1>
+      <p class="text-muted">
+        Applications for this position are no longer being accepted.
+        Thank you for your interest.
+      </p>
+      <p><a class="button button--ghost" href="index.html">Back to Altrium</a></p>
+    </div>
+
+    <!-- Network / server failure -->
+    <div class="card apply__card apply__state" id="apply-error" hidden>
+      <h1 class="heading-lg">Something went wrong</h1>
+      <p class="text-muted">
+        We couldn't load this vacancy right now. Please check your connection and
+        try again.
+      </p>
+      <p>
+        <button type="button" class="button button--primary" id="apply-retry">
+          Try again
+        </button>
       </p>
     </div>
 
-    <div class="card apply__card" id="apply-vacancy" hidden>
+    <!-- Vacancy details -->
+    <article class="card apply__card" id="apply-vacancy" hidden aria-labelledby="apply-title">
       <header class="apply__header">
         <h1 class="heading-lg" id="apply-title"></h1>
-        <p class="text-muted" id="apply-meta"></p>
+        <p class="apply__meta" id="apply-meta"></p>
       </header>
 
-      <section class="apply__section">
-        <h2 class="apply__section-title">About the role</h2>
+      <section class="apply__section" aria-labelledby="apply-description-title">
+        <h2 class="apply__section-title" id="apply-description-title">Job description</h2>
         <p class="apply__prose" id="apply-description"></p>
       </section>
 
-      <section class="apply__section">
-        <h2 class="apply__section-title">Requirements</h2>
+      <section class="apply__section" aria-labelledby="apply-requirements-title">
+        <h2 class="apply__section-title" id="apply-requirements-title">Requirements</h2>
         <ul class="detail-requirements" id="apply-requirements"></ul>
       </section>
+    </article>
 
-      <div class="alert alert--success apply__notice">
-        Online applications for this vacancy will open here soon.
-      </div>
-    </div>
+    <!-- Application form -->
+    <section class="card apply__card apply__form-card" id="apply-form-card" hidden
+      aria-labelledby="apply-form-title">
+      <header class="apply__header">
+        <h2 class="heading-lg" id="apply-form-title">Application form</h2>
+        <p class="text-muted">
+          Fields marked <span aria-hidden="true">*</span>
+          <span class="visually-hidden">asterisk</span> are required.
+        </p>
+      </header>
+
+      <form id="apply-form" class="applicant-form" novalidate enctype="multipart/form-data">
+        <div class="alert" id="apply-alert" role="alert" aria-live="assertive" hidden></div>
+
+        <div class="field field--plain" data-field="full_name">
+          <label class="field__label" for="full_name">
+            Full name <span class="field__req" aria-hidden="true">*</span>
+          </label>
+          <div class="field__control">
+            <input class="field__input" type="text" id="full_name" name="full_name"
+              autocomplete="name" maxlength="120" required aria-required="true"
+              aria-describedby="full_name-error" />
+          </div>
+          <p class="field__error" id="full_name-error" role="alert"></p>
+        </div>
+
+        <div class="applicant-form__grid">
+          <div class="field field--plain" data-field="email">
+            <label class="field__label" for="email">
+              Email <span class="field__req" aria-hidden="true">*</span>
+            </label>
+            <div class="field__control">
+              <input class="field__input" type="email" id="email" name="email"
+                autocomplete="email" inputmode="email" maxlength="254" required
+                aria-required="true" aria-describedby="email-error" />
+            </div>
+            <p class="field__error" id="email-error" role="alert"></p>
+          </div>
+
+          <div class="field field--plain" data-field="phone">
+            <label class="field__label" for="phone">
+              Phone <span class="field__req" aria-hidden="true">*</span>
+            </label>
+            <div class="field__control">
+              <input class="field__input" type="tel" id="phone" name="phone"
+                autocomplete="tel" inputmode="tel" maxlength="30" required
+                aria-required="true" aria-describedby="phone-error" />
+            </div>
+            <p class="field__error" id="phone-error" role="alert"></p>
+          </div>
+        </div>
+
+        <div class="field field--plain" data-field="location">
+          <label class="field__label" for="location">
+            Location <span class="field__req" aria-hidden="true">*</span>
+          </label>
+          <div class="field__control">
+            <input class="field__input" type="text" id="location" name="location"
+              autocomplete="address-level2" maxlength="120" required
+              aria-required="true" aria-describedby="location-error"
+              placeholder="City, Country" />
+          </div>
+          <p class="field__error" id="location-error" role="alert"></p>
+        </div>
+
+        <div class="field field--plain cv-field" data-field="cv">
+          <span class="field__label" id="cv-label">
+            CV <span class="field__req" aria-hidden="true">*</span>
+          </span>
+          <p class="field__hint" id="cv-hint">
+            Accepted formats: PDF or DOCX. Maximum size: <span id="cv-max">5 MB</span>.
+          </p>
+          <div class="cv-upload">
+            <input class="cv-upload__input" type="file" id="cv" name="cv"
+              required aria-required="true"
+              aria-describedby="cv-hint cv-error" />
+            <label class="button button--ghost cv-upload__trigger" for="cv">
+              Choose file
+            </label>
+            <span class="cv-upload__status" id="cv-status">No file selected</span>
+            <button type="button" class="cv-upload__remove" id="cv-remove" hidden>
+              Remove
+            </button>
+          </div>
+          <p class="field__error" id="cv-error" role="alert"></p>
+        </div>
+
+        <div class="applicant-form__actions">
+          <button type="submit" class="button button--primary button--block" id="apply-submit">
+            <span data-label>Submit application</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Success confirmation -->
+    <section class="card apply__card apply__success" id="apply-success" hidden
+      aria-labelledby="apply-success-title" role="status">
+      <svg class="apply__success-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+        <path d="m9 11 3 3L22 4" />
+      </svg>
+      <h1 class="heading-lg" id="apply-success-title">Application submitted successfully</h1>
+      <p class="text-muted">
+        Thank you for applying for <strong id="apply-success-role"></strong>.
+      </p>
+      <p>
+        Your application has been received. Our recruitment team will review it
+        and be in touch if your experience matches what the role needs.
+      </p>
+      <p class="apply__reference">
+        Application reference:
+        <strong id="apply-success-reference"></strong>
+      </p>
+      <p class="text-muted text-sm">
+        Please keep this reference for your records.
+      </p>
+    </section>
 
     <footer class="apply__footer">© 2025 Altrium Solutions. All rights reserved.</footer>
   </main>

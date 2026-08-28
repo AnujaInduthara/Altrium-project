@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Screening Results — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app" data-active-nav="ai-screening">
+    <section class="page" id="screening-page" hidden>
+      <header class="page-header">
+        <h1 class="page-header__title">AI Screening Results</h1>
+        <p class="page-header__subtitle">
+          AI has analysed the applications and scored candidates based on job fit.
+          Advisory only — the AI never hires, rejects or shortlists anyone.
+        </p>
+      </header>
+
+      <div class="alert" id="screening-alert" role="alert" aria-live="assertive" hidden></div>
+
+      <div class="card screening-toolbar">
+        <div class="field field--plain field--select screening-toolbar__field" data-field="vacancy">
+          <label class="field__label" for="vacancy-select">Vacancy</label>
+          <div class="field__control">
+            <select class="field__input" id="vacancy-select">
+              <option value="">Select a vacancy…</option>
+            </select>
+            <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+
+        <div class="field field--plain field--select screening-toolbar__field screening-toolbar__field--sm" data-field="filter">
+          <label class="field__label" for="status-filter">Filter</label>
+          <div class="field__control">
+            <select class="field__input" id="status-filter">
+              <option value="all">All</option>
+              <option value="submitted">New</option>
+              <option value="under_review">Review</option>
+              <option value="shortlisted">Shortlisted</option>
+              <option value="selected">Selected</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+
+        <div class="field field--plain screening-toolbar__field screening-toolbar__search" data-field="search">
+          <label class="field__label" for="candidate-search">Search</label>
+          <div class="field__control">
+            <input
+              class="field__input"
+              type="search"
+              id="candidate-search"
+              autocomplete="off"
+              placeholder="Search candidate…"
+            />
+          </div>
+        </div>
+
+        <button type="button" class="button button--primary screening-toolbar__run" id="screening-run" hidden>
+          Run pending screenings
+        </button>
+
+        <a class="button button--ghost screening-toolbar__run" id="select-candidates-link" href="candidates.html" hidden>
+          Select candidates →
+        </a>
+      </div>
+
+      <p class="screening-vacancy" id="screening-vacancy" hidden></p>
+
+      <div class="screening-summary" id="screening-summary" hidden>
+        <span class="screening-summary__item" data-summary-total></span>
+        <span class="screening-summary__item screening-summary__item--ok" data-summary-completed></span>
+        <span class="screening-summary__item" data-summary-average hidden></span>
+        <span class="screening-summary__item" data-summary-top hidden></span>
+        <span class="screening-summary__item" data-summary-running hidden></span>
+        <span class="screening-summary__item screening-summary__item--warn" data-summary-failed hidden></span>
+        <span class="screening-summary__item" data-summary-pending hidden></span>
+      </div>
+
+      <p class="status-message" id="screening-loading" role="status" hidden>Loading screening results…</p>
+
+      <div class="card empty-state" id="screening-prompt">
+        <h2 class="heading-lg">Select a vacancy</h2>
+        <p class="text-muted">Choose one of your vacancies above to see its AI-screened candidates.</p>
+      </div>
+
+      <div class="card empty-state" id="screening-empty" hidden>
+        <h2 class="heading-lg">No applications yet</h2>
+        <p class="text-muted">When someone applies to this vacancy, their AI screening will appear here.</p>
+      </div>
+
+      <div class="card empty-state" id="screening-no-match" hidden>
+        <h2 class="heading-lg">No candidates match</h2>
+        <p class="text-muted">Try a different filter or search term.</p>
+      </div>
+
+      <div class="card screening-results" id="screening-results" hidden>
+        <div class="table-scroll">
+          <table class="screening-table">
+            <thead>
+              <tr>
+                <th scope="col">Candidate</th>
+                <th scope="col">Match Score</th>
+                <th scope="col">Skills Match</th>
+                <th scope="col">Experience</th>
+                <th scope="col">Education</th>
+                <th scope="col" class="screening-table__num">Rank</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody id="screening-tbody"></tbody>
+          </table>
+        </div>
+        <p class="screening-note" id="screening-foot-note">
+          <strong>Note:</strong> Scores are generated by AI based on skills,
+          experience, education and job requirements. The final decision on every
+          applicant remains with HR.
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <!-- One candidate row, cloned per application by the controller. -->
+  <template id="screening-row-template">
+    <tr class="screening-row">
+      <td class="screening-row__candidate">
+        <a class="screening-row__name" data-name href="#"></a>
+        <span class="screening-row__ref" data-ref></span>
+      </td>
+      <td class="screening-row__score">
+        <div class="score-cell" data-score-cell hidden>
+          <span class="score-cell__value" data-score></span>
+          <span class="score-cell__bar" aria-hidden="true">
+            <span class="score-cell__fill" data-fill></span>
+          </span>
+        </div>
+        <span class="screening-chip" data-score-chip hidden></span>
+        <button type="button" class="linkbtn" data-rerun hidden></button>
+      </td>
+      <td><span class="skills-match" data-skills>—</span></td>
+      <td data-exp>—</td>
+      <td data-edu>—</td>
+      <td class="screening-table__num" data-rank>—</td>
+      <td><span class="badge" data-status></span></td>
+    </tr>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/aiScreeningPage.js"></script>
+</body>
+</html>

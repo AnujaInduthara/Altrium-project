@@ -1,6 +1,7 @@
 /* ============================================================================
-   Public application page (PB-02 scope — resolve a published vacancy).
-   Standalone: no app shell, no auth.
+   Public application page (PB-03) — view a published vacancy and apply.
+   Standalone: no app shell, no auth. Reuses the shared field / button / card /
+   alert components; only the page composition and the CV upload live here.
    ========================================================================== */
 
 .apply {
@@ -23,10 +24,33 @@
   gap: var(--space-5);
 }
 
+.apply__state {
+  gap: var(--space-4);
+}
+
 .apply__header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
+}
+
+.apply__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.apply__meta > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.apply__meta > span:not(:last-child)::after {
+  content: "·";
+  margin-left: var(--space-3);
+  color: var(--color-text-subtle);
 }
 
 .apply__section {
@@ -45,10 +69,132 @@
 
 .apply__prose {
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.apply__notice {
-  text-align: left;
+.detail-requirements {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.detail-requirements li {
+  overflow-wrap: anywhere;
+}
+
+/* Application form ------------------------------------------------------- */
+
+.apply__form-card {
+  gap: var(--space-5);
+}
+
+.applicant-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.applicant-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.applicant-form__actions {
+  margin-top: var(--space-2);
+}
+
+.field__req {
+  color: var(--color-danger);
+}
+
+/* CV upload ------------------------------------------------------------- */
+
+.cv-upload {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* The native file input stays in the DOM and keyboard-reachable, but visually
+   hidden — the <label for="cv"> styled as a button is the visible control and
+   opens the picker with no JS. */
+.cv-upload__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.cv-upload__trigger {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cv-upload__input:focus-visible + .cv-upload__trigger {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.cv-upload__status {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.cv-upload__status.is-selected {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.cv-upload__remove {
+  padding: 0.25rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cv-upload__remove:hover {
+  background: var(--color-danger-bg);
+}
+
+/* Success state ------------------------------------------------------------ */
+
+.apply__success {
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+}
+
+.apply__success-icon {
+  width: 3rem;
+  height: 3rem;
+  color: var(--color-success);
+}
+
+.apply__reference {
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  font-size: var(--text-sm);
+}
+
+.apply__reference strong {
+  letter-spacing: 0.04em;
 }
 
 .apply__footer {
@@ -56,4 +202,30 @@
   font-size: var(--text-xs);
   color: var(--color-text-subtle);
   text-align: center;
+}
+
+/* Utility --------------------------------------------------------------- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Responsive ------------------------------------------------------------- */
+
+@media (max-width: 600px) {
+  .applicant-form__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cv-upload {
+    align-items: flex-start;
+  }
 }

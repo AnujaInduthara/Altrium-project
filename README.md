@@ -220,10 +220,8 @@ The token is in the URL **hash**, not the query string, so it survives the
 links (`vacancy.html#id=…`) use the hash for the same reason; `readParam()` in
 `js/utils/urlParams.js` reads either.
 
-`frontend/apply.html` is a minimal public page (no sign-in, no app shell) that
-resolves the token and shows the role. **PB-03** will add the actual
-application form and CV upload here — for now it shows the vacancy plus an
-"applications open soon" notice.
+`frontend/apply.html` is a public page (no sign-in, no app shell) that resolves
+the token, shows the vacancy, and hosts the PB-03 application form.
 
 ### Running it
 
@@ -231,6 +229,516 @@ application form and CV upload here — for now it shows the vacancy plus an
 2. Restart the backend, serve `frontend/`.
 3. Log in, open **Vacancies**, click a draft, **Publish Vacancy**, confirm.
    Copy the public link; open it in any browser (no login) to see the vacancy.
+
+## PB-03: Applicant Submits a CV Application
+
+An **external applicant** — no account, no login — opens a published vacancy's
+public link (`apply.html#token=<public_token>`), reviews the role, fills a short
+form, uploads a CV (PDF or DOCX) and submits. The application is stored with
+status `submitted`. AI screening (PB-05) and HR review (PB-06) are **not** part
+of this step.
+
+> **Migration required:** run `backend/sql/004_create_applications.sql` in the
+> Supabase SQL editor (after `003`). It creates `public.applications` and the
+> **private** `candidate-cvs` storage bucket.
+
+### Flow
+
+```
+apply.html#token=<public_token>
+      |  GET /api/public/vacancies/:token   -> published vacancy (public fields only)
+      v
+Applicant fills the form + attaches a CV
+      |  client validation (js/utils/applicantValidators.js)
+      v
+POST /api/public/vacancies/:token/applications   (multipart/form-data, no auth)
+      |
+      v
+rate limit -> parse CV (multer, memory) -> confirm vacancy is PUBLISHED
+      -> validate fields -> verify CV bytes (magic number, not just MIME)
+      -> recent-duplicate check -> upload CV to private bucket
+      -> insert applications row  (delete the CV if the insert fails)
+      v
+201 { success: true, data: { reference: "APP-XXXXXXXX", job_title, status: "submitted" } }
+      -> success screen with the application reference
+```
+
+### Database (migration `004`)
+
+`public.applications`:
+
+| column | type | notes |
+|---|---|---|
+| `id` | uuid | PK, `gen_random_uuid()` — **never exposed** |
+| `vacancy_id` | uuid | not null, FK -> `job_vacancies(id)` |
+| `reference` | text | not null, **unique** — public-facing `APP-XXXXXXXX` shown to the applicant |
+| `full_name` / `email` / `phone` / `location` | text | not null, non-blank; email is lower-cased, whitespace collapsed |
+| `cv_path` | text | not null — object key inside the private `candidate-cvs` bucket |
+| `cv_original_name` / `cv_size_bytes` / `cv_content_type` | | retained for later HR review |
+| `status` | text | not null, default `submitted`; check allows the later PB-06/07 values |
+| `created_at` / `updated_at` | timestamptz | `now()`; `updated_at` via the shared trigger |
+
+Indexes on `vacancy_id`, `lower(email)`, `(vacancy_id, lower(email))`,
+`created_at desc`. **RLS is enabled with no policies** — exactly like
+`job_vacancies`, all access is backend-only via the service-role key. A leaked
+anon/authenticated key cannot read applicant PII or CVs.
+
+### Storage
+
+Private bucket **`candidate-cvs`** (`public = false`), 5 MiB limit,
+`application/pdf` + `.docx` MIME types only, **no** `storage.objects` policies —
+so anon/authenticated cannot list, read or upload. CVs are written by the
+backend to `applications/<vacancy-id>/<uuid>.<ext>` (the applicant's filename is
+never used as a key). Reading a CV later (PB-06) will go through the backend or
+a short-lived signed URL.
+
+### API
+
+**`GET /api/public/vacancies/:token`** — unchanged from PB-02 (public fields
+only; `404` for draft/closed/unknown).
+
+**`POST /api/public/vacancies/:token/applications`** — **unauthenticated**,
+`multipart/form-data` with `full_name`, `email`, `phone`, `location` and a `cv`
+file.
+
+| status | when |
+|---|---|
+| `201` | created — `{ success: true, data: { reference, job_title, status: "submitted" } }` |
+| `400` | field validation — `{ error: { code: "VALIDATION_ERROR", message, fields } }`, or a missing/unreadable CV |
+| `404` | token unknown, or the vacancy is not `published` |
+| `409` | `DUPLICATE_APPLICATION` — same email already applied to this vacancy in the last 10 minutes |
+| `413` | `CV_TOO_LARGE` |
+| `415` | `CV_UNSUPPORTED_TYPE` — not a real PDF / DOCX |
+| `429` | per-IP rate limit (8 submissions / 10 min; 60 lookups / min) |
+| `500` | unexpected — generic message only, details logged server-side |
+
+### Validation & file security
+
+- Both sides validate. The **backend is authoritative**: it re-trims/normalizes
+  every field and never trusts the browser's MIME type, extension or filename.
+- The CV is verified by **magic bytes** (`%PDF-` for PDF; ZIP header +
+  `[Content_Types].xml` for DOCX), not just its claimed type.
+- Storage key is a server-generated UUID path — no path traversal, no
+  collisions, no malicious filenames.
+- CV upload + row insert are not one transaction; if the insert fails the
+  backend deletes the just-uploaded CV (best-effort compensation, logged).
+
+### Env
+
+Optional: `CV_MAX_BYTES` (bytes) overrides the 5 MiB CV size limit. Keep it in
+sync with the bucket's `file_size_limit` and `frontend/js/config.js`
+(`MAX_CV_MB`). No new secrets.
+
+### Tests
+
+`cd backend && npm test` runs `backend/test/applicationValidation.test.js`
+(Node's built-in test runner) — field validation and CV magic-byte checks.
+
+## PB-04 (partial): HR reviews applications
+
+An HR user opens **Applications** in the sidebar, picks one of their vacancies,
+and sees the CV applications submitted to it — applicant name, email, phone,
+location, submission date and reference — with a **View CV** action. AI
+screening, status changes and candidate selection are still later backlog items;
+this is only the review list + CV access.
+
+### Flow
+
+```
+Applications (applications.html)  — or  Vacancy details -> "View applications"
+      |  pick a vacancy
+      v
+GET /api/vacancies/:id/applications      Authorization: Bearer <access_token>
+      |  authenticateUser -> requireHR -> getVacancyForUser (owner check)
+      v
+{ vacancy: {...}, applications: [ { reference, full_name, email, phone,
+  location, status, cv_original_name, cv_size_bytes, cv_content_type,
+  created_at }, ... ] }        (never cv_path)
+      |
+      |  "View CV"
+      v
+GET /api/applications/:id/cv             Authorization: Bearer <access_token>
+      |  owner-checked via the parent vacancy
+      v
+{ url: "<signed URL, 120s>", file_name, content_type }   -> opened in a new tab
+```
+
+### API
+
+| endpoint | notes |
+|---|---|
+| `GET /api/vacancies/:id/applications` | HR only; `403` if the vacancy belongs to another HR user, `404` if unknown. Returns public-safe applicant fields only. |
+| `GET /api/applications/:id/cv` | HR only; `404` (not `403`) if the application belongs to another HR user's vacancy, so nothing leaks. Returns a **short-lived signed URL** (120s) into the private `candidate-cvs` bucket — the CV is never served through a public URL or a raw storage key. |
+
+No schema or storage changes — this reads the `applications` table and bucket
+created by migration `004`.
+
+## PB-05: System filters CVs using AI
+
+After PB-04 stores a submitted application + CV, the system automatically runs
+an **AI-assisted screening pass**. The AI is an **assistant, not a decision
+maker** — it never hires, rejects, shortlists or selects anyone. It produces
+advisory signals (a 0–100 *AI Screening Score*, an *AI Recommendation*, matched
+/ missing skills, an experience and education assessment, an *AI Screening
+Summary*). The application's own `status` stays `submitted`; HR makes every
+recruitment decision (PB-06/07).
+
+> **Migration required:** run
+> [`backend/sql/005_create_application_screenings.sql`](backend/sql/005_create_application_screenings.sql)
+> after `004`.
+>
+> **AI key optional:** with no `GROQ_API_KEY` set (for the default `groq`
+> provider), screening rows are created as `pending` and the pipeline is inert —
+> PB-01…PB-04 are unaffected.
+
+### Flow
+
+```
+PB-03/PB-04: application + CV stored
+      |  screenApplicationInBackground(applicationId)   (fire-and-forget, after the HTTP response)
+      v
+ensure a screening row (pending)                        [idempotent — UNIQUE(application_id)]
+      |  claim: pending|failed -> processing            [atomic conditional UPDATE — one worker]
+      v
+load + verify dependencies (application, vacancy, CV; application belongs to vacancy)
+      |
+      v
+download CV from the private bucket (service role)  ->  extract text (PDF: pdf-parse, DOCX: mammoth)
+      |  normalize, guard against unreadable/scanned CVs, truncate very large CVs
+      v
+build a vacancy-specific prompt   (CV wrapped as UNTRUSTED DATA, delimiters neutralized)
+      |
+      v
+AI provider  (services/ai — provider abstraction; Groq (default) + Anthropic impls; bounded retries + backoff)
+      |
+      v
+validate structured JSON  (0<=score<=100, enums, array types, string caps; reject 120 / "ninety")
+      |
+      v
+recompute the score server-side  = weighted sum of skills/experience/requirements/education
+      |
+      v
+persist COMPLETED   (or FAILED with a safe error_code; the application + CV are never touched)
+      v
+GET /api/vacancies/:id/applications  now returns each application's `screening` summary  (PB-06)
+```
+
+### Database (migration `005`)
+
+`public.application_screenings` — one row per application
+(`application_id` **UNIQUE** = the idempotency guard). Key columns: `status`
+(`pending`/`processing`/`completed`/`failed`), `score` (`0..100` check),
+`recommendation` / `experience_match` / `education_match` (enum checks),
+`skills` / `matched_skills` / `missing_skills` (JSONB arrays), `summary`,
+`score_breakdown` (per-dimension sub-scores + weights), `model_provider` /
+`model_name` / `screening_version`, `error_code`, `attempts`. Indexes on
+`vacancy_id`, `status`, `(vacancy_id, score desc)`. **RLS enabled with no
+policies** — backend-only via the service-role key, exactly like `applications`.
+There is deliberately **no** `hired`/`rejected`/`selected` value: this table
+cannot express a hiring decision.
+
+### API
+
+| endpoint | notes |
+|---|---|
+| `GET /api/vacancies/:id/applications` | unchanged shape + each application now carries a `screening` object (`status`, `score`, `recommendation`, `matched_skills`, `missing_skills`, `summary`, `ai_screening_rank`, `processed_at`, …). |
+| `GET /api/applications/:id/screening` | HR only, owner-checked; the full screening result for one application. `{ screening: { status: "not_started" } }` if it has not run. |
+| `POST /api/applications/:id/screening/retry` | HR only, owner-checked; (re)queues one application's screening — covers **failed**, still-**pending** (e.g. submitted before the AI key was set), and re-running a **completed** one. `503 SCREENING_UNAVAILABLE` if no provider key is configured. |
+| `POST /api/vacancies/:id/screenings/run-pending` | HR only, owner-checked; bulk-queues every application under the vacancy whose screening has not completed. Returns `{ queued, total }`. Backs the "Run pending screenings" button on the AI Screening page. |
+
+Initial screening is still automatic and fire-and-forget after an application is stored; these endpoints only let HR re-drive it. Results surface both inline on **Applications** and, ranked by score, on the dedicated **AI Screening** page (`ai-screening.html`).
+
+### Security
+
+- AI API keys and `SUPABASE_SERVICE_ROLE_KEY` are read **server-side only**;
+  the browser never sees them and AI calls only happen on the backend.
+- The CV is downloaded privately, converted to **text**, and only the
+  job-relevant text is sent to the AI provider — never the file, never to the
+  frontend.
+- CV content is **untrusted**: it is wrapped in explicit delimiters, the
+  delimiter/instruction-fence tokens are stripped from the CV text, and the
+  system prompt tells the model to treat everything inside as data.
+- The model's output is **not trusted**: it is schema-validated and the score
+  is recomputed server-side from weighted dimensions before anything is stored.
+- CV contents, extracted text, prompts and API keys are **never logged** —
+  structured logs carry ids, provider/model names, score and duration only.
+- Screening results are internal HR data — applicants can never read them (RLS,
+  no anon policy, backend-only).
+- Fairness: the prompt forbids using protected characteristics and the
+  candidate name/contact details; scoring dimensions are job-relevant only.
+
+### Tests
+
+`cd backend && npm test` also runs `screeningResultValidation`,
+`cvTextExtraction` (real PDF/DOCX fixtures), `screeningPrompt` and
+`screeningPipeline` (the full extract → prompt → validate → score pipeline with
+an injected fake provider — no network).
+
+## PB-06: HR reviews the AI-filtered applicants
+
+The **human review** stage. HR opens a vacancy's **AI Screening** page, sees its
+applicants ranked by the AI CV-match score PB-05 already stored, and opens an
+individual **Applicant Review**. Everything here is **read-only** — opening an
+applicant never re-runs AI screening and never changes the application, its
+status, the score, the ranking or the summary. Candidate selection is PB-07 and
+is deliberately absent: there is no hire / reject / shortlist / "move to
+interview" action.
+
+### Flow
+
+```
+Vacancies → open a published vacancy → "View AI screening"
+      │      (or the AI Screening sidebar item → pick a vacancy)
+      ▼
+ai-screening.html#vacancy=<id>
+      │  GET /api/vacancies/:id/applications   (owner-checked; each row carries its `screening`)
+      ▼
+Applicants ranked by score (highest first); summary shows
+count / screened / average score / top match
+      │  "View" on a row
+      ▼
+applicant-review.html#id=<applicationId>&vacancy=<vacancyId>
+      │  GET /api/applications/:id/review    (owner-checked)
+      ▼
+Applicant details + AI Screening Score + rank + recommendation
++ matched / missing skills + experience & education match + AI summary
+      │  "View CV" / "Download CV"
+      ▼
+GET /api/applications/:id/cv[?download=1]  →  short-lived signed URL (120s, private bucket)
+```
+
+### API
+
+| endpoint | notes |
+|---|---|
+| `GET /api/applications/:id/review` | **new.** HR only, owner-checked via the parent vacancy. Returns `{ application, vacancy, screening }` — applicant contact details, the vacancy summary, and the stored screening result (via the same public-safe projection and advisory `ai_screening_rank` as the list). An application under another HR user's vacancy is reported as `404`, so nothing leaks. Read-only. |
+| `GET /api/applications/:id/cv` | unchanged, plus an optional `?download=1` that mints the signed URL with a `download` disposition (used by "Download CV" and for DOCX files browsers cannot preview inline). |
+| `GET /api/vacancies/:id/applications` | unchanged — already returns each application's `screening` summary; the AI Screening list now also shows the vacancy header (title · department · location) and average / top score. |
+
+### Database
+
+**No schema changes.** `application_screenings` (migration `005`) already stores
+the score, recommendation, matched / missing skills, experience & education
+match and summary. Ranking is derived deterministically from the persisted
+score (highest first; unscored last) — the same ordering the list and the
+review page share.
+
+### Security
+
+- Every PB-06 route is `authenticateUser` + `requireHR`, then an explicit
+  "caller owns the parent vacancy" check (`getVacancyForUser`) before any
+  applicant data or CV is returned. Changing `vacancyId` / `applicationId` in a
+  URL to someone else's data returns `404`.
+- CVs stay in the **private** `candidate-cvs` bucket and are only ever reached
+  through a 120-second signed URL minted server-side; the service-role key is
+  never exposed to the browser.
+- The review payload is a deliberate projection — no `cv_path`, no
+  `error_detail`, no internal screening diagnostics.
+
+### Frontend
+
+- `ai-screening.html` / `aiScreeningPage.js` — the ranked list (from PB-05) gains
+  a vacancy header, average / top-score summary items, a per-row **View** action
+  and a footer reminder that the results are advisory.
+- `applicant-review.html` / `applicantReviewPage.js` / `css/pages/applicant-review.css`
+  — **new** read-only applicant review screen (breadcrumb, applicant info, AI
+  score + meter + rank, matched / missing skill chips, experience & education
+  match, AI summary, View / Download CV, loading / empty-pending / error /
+  CV-unavailable states, "recommendations only" disclaimer).
+- `vacancy.html` — the published panel gains a **View AI screening** link.
+
+## PB-07: HR selects candidates
+
+The **selection** stage. After reviewing the AI-screened applicants (PB-06), HR
+opens a vacancy's **Select Candidates** page, explicitly ticks the applicants who
+should proceed to the interview process, confirms, and those applications become
+**candidates**. The AI never makes this call — its score / rank / matched skills
+are shown to inform the decision, and are left completely untouched by it.
+
+A "candidate" is not a new entity: it is an application whose lifecycle has
+advanced `submitted → selected`. It keeps every relationship it already had —
+vacancy, CV, AI screening result.
+
+> **Migration required:** run
+> [`backend/sql/006_add_candidate_selection.sql`](backend/sql/006_add_candidate_selection.sql)
+> after `005`. It adds `selected_at` / `selected_by` to `applications` (plus an
+> audit check constraint and a `(vacancy_id, status)` index). `'selected'` was
+> already an allowed `status` value since migration `004`, so no data migration
+> is needed.
+
+### Flow
+
+```
+Vacancies → open a published vacancy → "Select candidates"
+      │      (or AI Screening / Candidates sidebar item → pick a vacancy)
+      ▼
+candidates.html#vacancy=<id>
+      │  GET /api/vacancies/:id/applications   (owner-checked; each row carries its `screening`)
+      ▼
+Eligible applicants (status 'submitted') shown with a checkbox + AI score + rank;
+already-selected candidates shown read-only above
+      │  tick applicants → "Select Candidates" → confirm in a dialog
+      ▼
+POST /api/vacancies/:id/candidates/select   { applicationIds: [...] }
+      │  authenticateUser → requireHR → getVacancyForUser (owner check)
+      │  → every id must belong to this vacancy AND be 'submitted'
+      │  → single atomic UPDATE ... WHERE id = ANY(:ids)
+      │       AND vacancy_id = :id AND status = 'submitted'
+      ▼
+200 { success: true, data: { selectedCount, newlySelectedCount, candidates: [...] } }
+      → success confirmation; the selected applicants now appear as candidates
+```
+
+### API
+
+| endpoint | notes |
+|---|---|
+| `POST /api/vacancies/:id/candidates/select` | **new.** HR only, owner-checked. Body `{ applicationIds: string[] }`. Transitions each `submitted` application to `selected`, recording `selected_by` (the authenticated HR user) and `selected_at` (server time). Returns the refreshed candidate list (selected applications + their AI screening summary). |
+| `GET /api/vacancies/:id/applications` | unchanged shape; each application row now also carries `selected_at` / `selected_by`, and the Select Candidates page reads it to separate eligible applicants from existing candidates. |
+
+| status | when |
+|---|---|
+| `200` | selection saved (idempotent — re-submitting the same set is safe, no duplicate candidates) |
+| `400` | `NO_APPLICATIONS_SELECTED` (empty selection), `INVALID_REQUEST` (malformed body), `TOO_MANY_APPLICATIONS`, or `INVALID_APPLICATION` (an id that is not one of this vacancy's applications — e.g. from another vacancy) |
+| `401` | missing / invalid / expired token |
+| `403` | authenticated but not HR |
+| `404` | `VACANCY_NOT_FOUND` — unknown vacancy, or one owned by another HR user (reported as 404 so nothing leaks) |
+| `409` | `APPLICATION_NOT_ELIGIBLE` — a selected id is `rejected` or otherwise not in a selectable state |
+
+### Security & data integrity
+
+- Every part of the operation is server-authorized: `authenticateUser` +
+  `requireHR`, then an explicit "caller owns the parent vacancy" check, then a
+  per-id check that each application belongs to that vacancy. The HR identity,
+  the vacancy ownership and the application–vacancy relationship are **never**
+  taken from the request body.
+- The write is one conditional `UPDATE` guarded by `status = 'submitted'`, so it
+  is atomic and **idempotent**: a double-click / retried request updates zero
+  rows for an already-selected applicant instead of creating a second candidate.
+- `application_screenings` (score, rank, matched / missing skills, summary,
+  timestamps) and the CV file + its metadata are **not touched** by selection.
+- RLS on `applications` is unchanged — enabled with no policies; this mutation is
+  backend-only via the service-role key, which never reaches the browser.
+
+### Frontend
+
+- `candidates.html` / `candidatesPage.js` / `css/pages/candidates.css` — **new**
+  Select Candidates screen: workflow step indicator, vacancy picker, a read-only
+  "Selected candidates" section, a checkbox list of eligible applicants (AI score
+  + rank shown, never auto-ticked), a live "N applicants selected" count,
+  Cancel / Select Candidates, a confirmation dialog, and loading / empty /
+  success / error / validation states.
+- `vacancy.html` and `ai-screening.html` gain a **Select candidates** link
+  (deep-linked to the chosen vacancy). The **Candidates** sidebar item now
+  resolves to this page.
+
+## PB-08: HR closes a job vacancy
+
+The **final Sprint-1 step**. When recruitment for a published vacancy no longer
+needs to accept new applications, HR opens it and clicks **Close Vacancy**,
+confirms in a dialog, and the vacancy moves `PUBLISHED → CLOSED`. Closing is a
+one-way workflow state change — **not** a deletion. Every existing application,
+CV, AI screening result and selected candidate is preserved and stays
+accessible to the owning HR user; only *new* public applications are blocked.
+
+> **Migration required:** run
+> [`backend/sql/007_add_vacancy_closing.sql`](backend/sql/007_add_vacancy_closing.sql)
+> after `006`. It adds `closed_at` / `closed_by` to `job_vacancies` plus a
+> `NOT VALID` audit check constraint. `'closed'` has been an allowed `status`
+> since migration `002`, so there is no data migration and existing rows stay
+> valid.
+
+### Flow
+
+```
+Vacancies → open a published vacancy (vacancy.html#id=<uuid>)
+      │  "Close Vacancy" → confirm in a modal
+      ▼
+POST /api/vacancies/:id/close   Authorization: Bearer <access_token>   (no body)
+      │  authenticateUser → requireHR → service:
+      │    exists? → owned by caller? → status == 'published'?
+      │    → conditional UPDATE ... SET status='closed', closed_at=now(),
+      │        closed_by=<hr> WHERE id=:id AND status='published'
+      ▼
+200 { success: true, data: { ..., status: "closed", closed_at, closed_by } }
+      → panel shows a "Closed" badge + "Closed <date>"; recruitment-data links stay
+```
+
+### Database (migration `007`)
+
+Adds to `public.job_vacancies`:
+
+| column | type | notes |
+|---|---|---|
+| `closed_at` | timestamptz | server timestamp of the `PUBLISHED → CLOSED` transition; NULL unless `status = 'closed'` |
+| `closed_by` | uuid | FK → `auth.users(id)`; the HR user who closed it; NULL unless `status = 'closed'` |
+
+Plus a `NOT VALID` check constraint (`job_vacancies_closed_audit`): a `closed`
+row must have both audit fields, a non-`closed` row must have neither. RLS is
+unchanged — closing is backend-only (service role); there is deliberately **no**
+authenticated/anon UPDATE policy, so a leaked browser key cannot change a
+vacancy's status.
+
+### API
+
+**`POST /api/vacancies/:id/close`** — HR only, **no request body**. The server
+controls `status` / `closed_at` / `closed_by`; anything in a body is ignored.
+
+| status | meaning |
+|---|---|
+| `200` | closed — data includes `status: "closed"`, `closed_at`, `closed_by`, and `public_url` (kept — the link stays resolvable) |
+| `401` | missing / invalid / expired token |
+| `403` | authenticated non-HR, **or** the vacancy belongs to another HR user |
+| `404` | `VACANCY_NOT_FOUND` |
+| `409` | `VACANCY_ALREADY_CLOSED` (re-close / idempotent double-click) or `VACANCY_NOT_PUBLISHED` (e.g. still a draft) |
+
+**`GET /api/public/vacancies/:token`** — **unauthenticated**. Now resolves both
+`published` and `closed` vacancies:
+
+| vacancy state | response |
+|---|---|
+| `published` | `200` with public-safe fields + `status: "published"` (the application form is shown) |
+| `closed` | `410 VACANCY_CLOSED` — `apply.html` shows a "Job vacancy closed / applications are no longer being accepted" notice |
+| `draft` / unknown token | plain `404` (nothing about a non-live vacancy leaks) |
+
+**`POST /api/public/vacancies/:token/applications`** — unchanged: only a
+`published` vacancy accepts a submission, so a closed vacancy rejects new
+applications server-side (`404`) even though its link still resolves.
+
+### Security & data integrity
+
+- Server-authorized end to end: `authenticateUser` + `requireHR`, then an
+  explicit "caller owns this vacancy" check (`created_by`). The HR identity and
+  the ownership are **never** taken from the request body / query.
+- The write is one conditional `UPDATE` guarded by `status = 'published'`, so it
+  is atomic and **idempotent**: a double-click / retried request updates zero
+  rows once the vacancy is closed instead of re-stamping the audit fields.
+- `PUBLISHED → CLOSED` is the only transition. `CLOSED → PUBLISHED` /
+  `CLOSED → DRAFT` are impossible (the status-machine rule in
+  `utils/vacancyClosure.js` and the conditional `UPDATE` both enforce it).
+- No cascade, no deletion: applications, CVs (private bucket), screening results
+  and selected candidates are untouched and remain visible to the owning HR user.
+- The `public_token` is kept, so `/apply.html#token=…` stays resolvable — it
+  just renders the closed state.
+
+### Frontend
+
+- `vacancy.html` / `vacancyPage.js` / `css/pages/vacancy.css` — the published
+  panel gains a **Close Vacancy** button (shown only when `status = 'published'`)
+  and an accessible confirmation dialog (reuses the shared `Modal`). After
+  closing, the switch is replaced by a **Closed** badge, a "Closed &lt;date&gt;"
+  note appears, the page heading updates, and the recruitment-data links
+  (applications / AI screening / candidates) stay available.
+- `apply.html` / `applyPage.js` — a new **"Job vacancy closed"** state, shown
+  when the public lookup returns `410`.
+- `vacancyService.close(id)` — wraps `POST /api/vacancies/:id/close`.
+
+### Tests
+
+`cd backend && npm test` also runs `vacancyClosure.test.js` — the
+`PUBLISHED → CLOSED` transition rule (allowed only from `published`; a draft is
+`VACANCY_NOT_PUBLISHED`, an already-closed vacancy is `VACANCY_ALREADY_CLOSED`,
+unknown statuses are never closable).
 
 ## Project structure
 
@@ -248,16 +756,25 @@ cd backend
 npm install
 ```
 
-Copy `backend/.env` and fill in:
+Copy `backend/.env.example` to `backend/.env` and fill in the Supabase values.
+The rest are optional:
 
 | Variable                    | Where to find it                                      |
 |------------------------------|--------------------------------------------------------|
 | `PORT`                       | Any free port, default `5000`                          |
-| `FRONTEND_URL`                | Origin of your local static server, e.g. `http://127.0.0.1:5500` |
-| `APP_URL`                     | Public base URL for the application link; usually same as `FRONTEND_URL`. Defaults to `FRONTEND_URL` if unset |
-| `SUPABASE_URL`                | Supabase Dashboard > Project Settings > API             |
-| `SUPABASE_ANON_KEY`           | Supabase Dashboard > Project Settings > API             |
-| `SUPABASE_SERVICE_ROLE_KEY`   | Supabase Dashboard > Project Settings > API (**server-only, never commit**) |
+| `SUPABASE_URL`               | Supabase Dashboard > Project Settings > API             |
+| `SUPABASE_ANON_KEY`          | Supabase Dashboard > Project Settings > API             |
+| `SUPABASE_SERVICE_ROLE_KEY`  | Supabase Dashboard > Project Settings > API (**server-only, never commit**) |
+| `FRONTEND_URL`               | *(optional)* frontend origin; localhost + private-LAN origins are allowed automatically |
+| `CORS_ORIGINS`               | *(optional)* extra allowed browser origins, comma-separated (e.g. a deployed URL) |
+| `CORS_ALLOW_ANY`             | *(optional)* `true` reflects every origin — only behind a trusted proxy |
+| `APP_URL`                    | *(optional)* fallback base URL for the application link when a request has no `Origin` header |
+| `CV_MAX_BYTES`               | *(optional)* max CV upload size in bytes; defaults to `5242880` (5 MiB)     |
+| `AI_PROVIDER`                | *(PB-05)* AI provider for CV screening; `groq` (default) or `anthropic`     |
+| `AI_MODEL`                   | *(PB-05)* provider model id; default `openai/gpt-oss-120b` (Groq)           |
+| `GROQ_API_KEY`               | *(PB-05)* **server-only secret** for the default `groq` provider. Leave blank to keep AI screening inactive (rows stay `pending`) |
+| `ANTHROPIC_API_KEY`          | *(PB-05)* **server-only secret**, only when `AI_PROVIDER=anthropic`        |
+| `AI_EFFORT` / `AI_MAX_OUTPUT_TOKENS` / `AI_REQUEST_TIMEOUT_MS` / `AI_TEMPERATURE` / `AI_SCORE_WEIGHTS` / `AI_SCREENING_ENABLED` | *(PB-05, optional)* screening tuning — see `.env.example` |
 
 Run:
 
@@ -272,6 +789,10 @@ In the Supabase SQL editor, run the migrations in order:
 1. [`backend/sql/001_create_profiles.sql`](backend/sql/001_create_profiles.sql) — `profiles` table (links `auth.users` to an HR role), RLS self-read only.
 2. [`backend/sql/002_create_job_vacancies.sql`](backend/sql/002_create_job_vacancies.sql) — `job_vacancies` table (PB-01).
 3. [`backend/sql/003_add_vacancy_publishing.sql`](backend/sql/003_add_vacancy_publishing.sql) — `public_token` + `published_at` (PB-02).
+4. [`backend/sql/004_create_applications.sql`](backend/sql/004_create_applications.sql) — `applications` table + private `candidate-cvs` storage bucket (PB-03).
+5. [`backend/sql/005_create_application_screenings.sql`](backend/sql/005_create_application_screenings.sql) — `application_screenings` table (PB-05 AI CV screening results), RLS with no policies.
+6. [`backend/sql/006_add_candidate_selection.sql`](backend/sql/006_add_candidate_selection.sql) — `selected_at` / `selected_by` audit columns on `applications` + supporting constraint/index (PB-07 candidate selection).
+7. [`backend/sql/007_add_vacancy_closing.sql`](backend/sql/007_add_vacancy_closing.sql) — `closed_at` / `closed_by` audit columns on `job_vacancies` + audit check constraint (PB-08 vacancy closing). `'closed'` was already an allowed `status` value since migration `002`.
 
 There is no self-service HR sign-up. To create your first HR user:
 
@@ -285,27 +806,40 @@ There is no self-service HR sign-up. To create your first HR user:
 ### 3. Frontend
 
 `frontend/js/config.js` holds the public (browser-safe) Supabase URL and anon
-key — fill in the same two values from the table above:
+key — fill in the same two values from the table above. You do **not** need to
+set an API URL: the frontend calls the backend on **the same host that served
+the page, port 5000**, so it works from `localhost`, `127.0.0.1` or the
+machine's LAN IP with no edits.
 
-```js
-export const APP_CONFIG = {
-  SUPABASE_URL: 'YOUR_SUPABASE_PROJECT_URL',
-  SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY',
-  API_BASE_URL: 'http://localhost:5000/api',
-};
-```
-
-See [`frontend/README.md`](frontend/README.md) for the full folder layout and
-conventions.
-
-Serve the `frontend/` folder with any static file server, matching the port
-you set as `FRONTEND_URL` in the backend `.env`. For example:
+Serve the `frontend/` folder with any static file server. For example:
 
 ```
 npx serve frontend -l 5500
 ```
 
-or use the VS Code "Live Server" extension. Then open `http://127.0.0.1:5500/login.html`.
+or use the VS Code "Live Server" extension. Then open
+`http://localhost:5500/login.html` (or `http://<your-lan-ip>:5500/login.html`).
+
+See [`frontend/README.md`](frontend/README.md) for the full folder layout and
+conventions.
+
+### Runs on any laptop
+
+There is nothing machine-specific to change:
+
+- **CORS** — the backend allows `localhost`, `127.0.0.1` and private-LAN origins
+  (`192.168.x.x`, `10.x.x.x`, `172.16–31.x.x`) on any port automatically
+  (`backend/src/config/cors.js`). Set `CORS_ORIGINS` (comma-separated) only to
+  add a non-local origin such as a deployed URL.
+- **API URL** — resolved from `window.location` at runtime. Override with
+  `?apiBase=http://host:5000/api` in the URL (remembered afterwards) or
+  `window.__ALTRIUM_API_BASE__` if the backend runs on a different host/port.
+- **Public application link** — built from the HR user's own browser origin, so
+  the copied `apply.html#token=…` link points at the host they are using.
+
+> **Getting a CORS error?** Restart the backend after editing `backend/.env`,
+> and make sure the API request and the page use hosts that resolve to the same
+> machine (both `localhost`, or both the LAN IP — not one of each).
 
 ## Security notes
 
@@ -313,15 +847,32 @@ or use the VS Code "Live Server" extension. Then open `http://127.0.0.1:5500/log
 - Passwords are handled entirely by Supabase Auth; nothing here stores or hashes passwords.
 - HR authorization is decided server-side by looking up `profiles.role`, not from anything the client sends.
 - `profiles` and `job_vacancies` have RLS enabled with per-owner policies; there is no anon policy on either.
-- The `DRAFT -> PUBLISHED` transition and the `public_token` are set only by the backend; a request body cannot influence them.
+- `applications` has RLS enabled with **no** policies; CVs live in a **private** bucket. Applicant PII and CVs are backend-only.
+- Candidate selection (PB-07) is an HR-only, owner-checked mutation: the acting HR user, the vacancy ownership and every application's vacancy are verified server-side, and the `submitted → selected` write is a single atomic, idempotent statement. AI screening results and CVs are never modified by it.
+- Vacancy closing (PB-08) is likewise HR-only and owner-checked: `PUBLISHED → CLOSED` is a single atomic, idempotent conditional `UPDATE`, the only allowed transition, and it never deletes or modifies applications, CVs, screening results or selected candidates. `closed_at` / `closed_by` are server-set.
+- The `DRAFT -> PUBLISHED` / `PUBLISHED -> CLOSED` transitions and the `public_token` are set only by the backend; a request body cannot influence them.
 - The public application link contains only the random token — no internal id, no HR identity.
+- Applicant submissions never touch Supabase directly; the browser only talks to the backend, which validates everything (including the CV bytes).
 - Backend error responses never include stack traces, SQL errors, or Supabase internals.
+- CORS reflects an origin only if it is explicitly configured or is a localhost / private-LAN address; public internet origins are rejected unless added to `CORS_ORIGINS`.
 
-## Remaining Sprint 1 work
+## Sprint 1 status
 
-Done: Step 0 (HR Login), PB-01 (Create Job Vacancy — draft), PB-02 (Publish
-Vacancy — public link generated).
+**Sprint 1 complete.** Step 0 (HR Login), PB-01 (Create Job Vacancy — draft),
+PB-02 (Publish Vacancy — public link generated), PB-03 (Applicant submits a CV
+application), PB-04 partial (HR reviews the application list + opens CVs), PB-05
+(AI-assisted CV screening — score, recommendation, matched/missing skills,
+summary stored per application; advisory only), PB-06 (HR reviews the
+AI-filtered applicants — ranked AI Screening list + read-only Applicant Review
+with secure CV access), PB-07 (HR selects candidates — explicit, confirmed
+`submitted → selected` transition), PB-08 (HR closes a job vacancy — one-way
+`PUBLISHED → CLOSED`; recruitment data preserved, new public applications
+blocked).
 
-Not yet implemented: PB-03 applicant CV submission, PB-04 application storage,
-PB-05 AI CV screening, PB-06 applicant review, PB-07 candidate selection,
-PB-08 vacancy closing.
+The AI screening pipeline still never changes `applications.status`; the HR
+status transitions are PB-07's `submitted → selected` (applications) and PB-08's
+`published → closed` (vacancies).
+
+Next: **Sprint 2 — Configure Interview Stages.**
+
+

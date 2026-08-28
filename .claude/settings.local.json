@@ -16,7 +16,11 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" --max-time 2 http://localhost:5055/api/hr/me)",
       "Read(//c/tmp/**)",
       "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --no-sandbox --virtual-time-budget=8000 --run-all-compositor-stages-before-draw --dump-dom \"http://localhost:5599/create-vacancy.html\")",
-      "Bash(node _pb01_seed.cjs)"
+      "Bash(node _pb01_seed.cjs)",
+      "Bash(node --check js/pages/applicantReviewPage.js)",
+      "Bash(node --check js/pages/aiScreeningPage.js)",
+      "Bash(node --check js/services/applicationService.js)",
+      "Bash(node --check js/pages/vacancyPage.js)"
     ]
   }
 }

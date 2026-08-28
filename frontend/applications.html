@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Applications — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app" data-active-nav="applications">
+    <section class="page" id="applications-page" hidden>
+      <header class="page-header">
+        <h1 class="page-header__title">Applications</h1>
+        <p class="page-header__subtitle">
+          Review the CV applications submitted for your job vacancies.
+        </p>
+      </header>
+
+      <div class="alert" id="applications-alert" role="alert" aria-live="assertive" hidden></div>
+
+      <div class="card applications-toolbar">
+        <div class="field field--plain field--select applications-toolbar__field" data-field="vacancy">
+          <label class="field__label" for="vacancy-select">Vacancy</label>
+          <div class="field__control">
+            <select class="field__input" id="vacancy-select" aria-describedby="applications-count">
+              <option value="">Select a vacancy…</option>
+            </select>
+            <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+        <p class="applications-toolbar__count" id="applications-count" aria-live="polite" hidden></p>
+      </div>
+
+      <p class="status-message" id="applications-loading" role="status" hidden>Loading applications…</p>
+
+      <div class="card empty-state" id="applications-prompt">
+        <h2 class="heading-lg">Select a vacancy</h2>
+        <p class="text-muted">Choose one of your vacancies above to see who has applied.</p>
+      </div>
+
+      <div class="card empty-state" id="applications-empty" hidden>
+        <h2 class="heading-lg">No applications yet</h2>
+        <p class="text-muted">
+          When someone applies to this vacancy, their details will appear here.
+        </p>
+      </div>
+
+      <ul class="application-list" id="applications-list" hidden></ul>
+    </section>
+  </div>
+
+  <!-- One applicant card, cloned per application by the controller. -->
+  <template id="application-card-template">
+    <li class="application-card card">
+      <div class="application-card__head">
+        <h2 class="application-card__name" data-name></h2>
+        <span class="badge application-card__status" data-status></span>
+      </div>
+      <!-- PB-05: AI screening summary. Advisory only — the AI does not decide. -->
+      <div class="screening" data-screening hidden>
+        <div class="screening__head">
+          <span class="screening__label">AI Screening</span>
+          <span class="badge screening__status" data-screening-status></span>
+        </div>
+        <div class="screening__body" data-screening-body hidden>
+          <div class="screening__score">
+            <span class="screening__score-value" data-screening-score></span>
+            <span class="screening__score-max">/ 100</span>
+            <span class="screening__rec" data-screening-rec></span>
+            <span class="screening__rank" data-screening-rank hidden></span>
+          </div>
+          <p class="screening__summary" data-screening-summary></p>
+          <div class="screening__skills" data-screening-matched hidden>
+            <span class="screening__skills-label">Matched</span>
+            <span data-screening-matched-list></span>
+          </div>
+          <div class="screening__skills" data-screening-missing hidden>
+            <span class="screening__skills-label">Not demonstrated</span>
+            <span data-screening-missing-list></span>
+          </div>
+        </div>
+        <p class="screening__note" data-screening-note hidden></p>
+        <button type="button" class="button button--ghost screening__retry" data-screening-retry hidden>
+          Re-run AI screening
+        </button>
+      </div>
+
+      <dl class="application-card__details">
+        <div class="application-card__row">
+          <dt>Email</dt>
+          <dd><a data-email-link><span data-email></span></a></dd>
+        </div>
+        <div class="application-card__row">
+          <dt>Phone</dt>
+          <dd><a data-phone-link><span data-phone></span></a></dd>
+        </div>
+        <div class="application-card__row">
+          <dt>Location</dt>
+          <dd data-location></dd>
+        </div>
+        <div class="application-card__row">
+          <dt>Submitted</dt>
+          <dd data-submitted></dd>
+        </div>
+        <div class="application-card__row">
+          <dt>Reference</dt>
+          <dd><code data-reference></code></dd>
+        </div>
+      </dl>
+      <div class="application-card__actions">
+        <span class="application-card__cv-meta" data-cv-meta></span>
+        <button type="button" class="button button--primary application-card__cv" data-view-cv>
+          <span data-label>View CV</span>
+        </button>
+      </div>
+    </li>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/applicationsPage.js"></script>
+</body>
+</html>
