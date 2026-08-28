@@ -8,12 +8,18 @@ const SUPABASE_ANON_KEY = [
   'zssgbNHF9ZCSEXZxynIlqUEQZFAWfkCHtXdyzO5HqK4',
 ].join('.');
 
+// The deployed backend. Used automatically whenever the site is served from a
+// non-local hostname (e.g. the Netlify domain). Override per-deployment with
+// window.__ALTRIUM_API_BASE__ or ?apiBase= (see below).
+const PRODUCTION_API_BASE_URL = 'https://altrium-project.onrender.com/api';
+
 // Where the backend API lives.
 //
-// By default the API is assumed to run on the SAME host that served this page,
-// on port 5000 — so the app works whether you open it as http://localhost:5500,
-// http://127.0.0.1:5500 or http://<your-lan-ip>:5500, with no per-machine
-// edits. That is what makes the project run on any laptop out of the box.
+// When the page is served locally (localhost / 127.0.0.1 / a private-LAN IP)
+// the API is assumed to run on the SAME host, port 5000 — so the app works
+// whether you open it as http://localhost:5500, http://127.0.0.1:5500 or
+// http://<your-lan-ip>:5500, with no per-machine edits. When the page is
+// served from anywhere else, PRODUCTION_API_BASE_URL above is used.
 //
 // Overrides, in priority order:
 //   1. window.__ALTRIUM_API_BASE__  — set it in a <script> before the app loads
@@ -60,16 +66,34 @@ function pickRawApiBase() {
     /* localStorage can throw in privacy mode — fall through to the default */
   }
 
-  // 3: same host as the frontend, port 5000
+  // 3: no explicit override — decide from where the page is being served.
   if (
     typeof window !== 'undefined' &&
     window.location &&
     /^https?:$/.test(window.location.protocol)
   ) {
-    return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+    // Local dev: talk to the backend on the same host, port 5000.
+    if (isLocalHostname(window.location.hostname)) {
+      return `${window.location.protocol}//${window.location.hostname}:5000/api`;
+    }
+    // Deployed (Netlify, a custom domain, …): use the hosted backend.
+    return PRODUCTION_API_BASE_URL;
   }
 
   return 'http://localhost:5000/api';
+}
+
+// True for localhost, loopback and RFC-1918 private-LAN addresses — i.e. the
+// app is being run from a laptop rather than a public deployment.
+function isLocalHostname(hostname) {
+  return (
+    hostname === 'localhost' ||
+    hostname === '[::1]' ||
+    /^127(?:\.\d{1,3}){3}$/.test(hostname) ||
+    /^10(?:\.\d{1,3}){3}$/.test(hostname) ||
+    /^192\.168(?:\.\d{1,3}){2}$/.test(hostname) ||
+    /^172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}$/.test(hostname)
+  );
 }
 
 // Trim trailing slashes and, if the URL has no path at all, add the `/api`

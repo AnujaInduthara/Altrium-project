@@ -20,7 +20,9 @@
       "Bash(node --check js/pages/applicantReviewPage.js)",
       "Bash(node --check js/pages/aiScreeningPage.js)",
       "Bash(node --check js/services/applicationService.js)",
-      "Bash(node --check js/pages/vacancyPage.js)"
+      "Bash(node --check js/pages/vacancyPage.js)",
+      "Bash(npm test *)",
+      "Bash(node -e \"const {isAllowedOrigin}=require\\('./src/config/cors'\\); ['https://resilient-khapse-fd139a.netlify.app','https://deploy-preview-12--resilient-khapse-fd139a.netlify.app','http://localhost:5500','https://evil.com', undefined].forEach\\(o=>console.log\\(o, '=>', isAllowedOrigin\\(o\\)\\)\\);\")"
     ]
   }
 }
