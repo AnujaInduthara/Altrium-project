@@ -314,7 +314,7 @@ async function listPublishedVacancies({ q, department, limit, offset }) {
 }
 
 // Public, unauthenticated lookup used by the PB-03 application submission. Like
-// getPublishedVacancyByToken it only ever resolves a PUBLISHED vacancy, but it
+// getPublicVacancyByToken it only ever resolves a PUBLISHED vacancy, but it
 // returns the internal `id` and `job_title` for the backend's own use (linking
 // the application row, wording the confirmation) — this shape is never sent to
 // the applicant's browser. Returns null for draft / closed / unknown tokens.
@@ -361,8 +361,9 @@ module.exports = {
   listVacanciesForUser,
   getVacancyForUser,
   publishVacancy,
+  closeVacancy,
   listPublishedVacancies,
-  getPublishedVacancyByToken,
+  getPublicVacancyByToken,
   getApplicableVacancyByToken,
   getVacancyForScreening,
   VacancyError,
