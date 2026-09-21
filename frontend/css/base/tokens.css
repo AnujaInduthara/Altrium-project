@@ -31,6 +31,8 @@
   --color-danger-bg: #fdecea;
   --color-success: #1a7f4b;
   --color-success-bg: #e7f5ec;
+  --color-warning: #b06f12;
+  --color-warning-bg: #fdf1df;
 
   /* Radius --------------------------------------------------------------------- */
   --radius-sm: 8px;

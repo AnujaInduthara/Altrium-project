@@ -39,7 +39,7 @@ const formCard = document.getElementById('vacancy-form-card');
 const successCard = document.getElementById('vacancy-success');
 const form = document.getElementById('vacancy-form');
 const alert = createAlert(document.getElementById('form-alert'));
-const submitBtn = document.getElementById('save-draft-btn');
+const submitBtn = document.getElementById('create-vacancy-btn');
 const submitLabel = submitBtn.querySelector('[data-label]');
 const descCount = document.getElementById('job_description-count');
 
@@ -51,7 +51,7 @@ function setLoading(loading) {
   submitting = loading;
   submitBtn.disabled = loading;
   submitBtn.setAttribute('aria-busy', String(loading));
-  submitLabel.textContent = loading ? 'Saving…' : 'Save Draft';
+  submitLabel.textContent = loading ? 'Creating…' : 'Create Vacancy';
 }
 
 function clearAllErrors() {

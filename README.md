@@ -1,5 +1,48 @@
 # Altrium — Recruitment Management Platform
 
+## Backlog status at a glance
+
+| ID | Item | Sprint | Status |
+|---|---|---|---|
+| Step 0 | HR login (Supabase Auth + HR authorization) | 1 | ✅ Done |
+| PB-01 | HR creates a job vacancy | 1 | ✅ Done |
+| PB-02 | HR publishes a job vacancy | 1 | ⚠️ Update needed — see [Sprint 1 update](#sprint-1-update--public-applicant-portal) |
+| PB-03 | Applicant views and submits a job application | 1 | ⚠️ Update needed — see [Sprint 1 update](#sprint-1-update--public-applicant-portal) |
+| PB-04 | System stores submitted applications | 1 | ✅ Done |
+| PB-05 | System filters CVs using AI | 1 | ✅ Done |
+| PB-06 | HR reviews AI-filtered applicants | 1 | ✅ Done |
+| PB-07 | HR selects candidates for interviews | 1 | ❌ Not started |
+| PB-08 | HR closes a job vacancy | 1 | ❌ Not started |
+| PB-09 | HR selects the candidate's interview level | 2 | ❌ Not started |
+| PB-10 | System displays default interview stages | 2 | ❌ Not started |
+| PB-11 | HR customizes the interview stages | 2 | ❌ Not started |
+| PB-12 | HR configures interviewer requirements per stage | 2 | ❌ Not started |
+| PB-13 | Interviewer manages availability via calendar | 2 | ❌ Not started |
+| PB-14 | HR views interviewer availability | 2 | ❌ Not started |
+| PB-15 | HR assigns available interviewers | 2 | ❌ Not started |
+| PB-16 | HR schedules interviews | 2 | ❌ Not started |
+| PB-17 | System sends interview notifications | 2 | ❌ Not started |
+| PB-18 | Interviewer views assigned interviews | 2 | ❌ Not started |
+| PB-19 | Interviewer records ratings and feedback | 2 | ❌ Not started |
+| PB-20 | Hiring Manager reviews interview results | 2 | ❌ Not started |
+| PB-21 | Hiring Manager makes the final hiring decision | 2 | ❌ Not started |
+| PB-22 | System sends the final decision to HR + candidate | 2 | ❌ Not started |
+| PB-23 | Management views recruitment dashboard/pipeline | 2 | ❌ Not started |
+| PB-24 | Management generates recruitment reports | 2 | ❌ Not started |
+
+Sprint 1's original design had HR copy a vacancy's public link and share it
+manually. That is being replaced with a public **Applicant Portal** listing —
+see [Sprint 1 update](#sprint-1-update--public-applicant-portal) below for
+exactly what changes and what's still missing. Sprint 2 (PB-09…PB-24) is fully
+specced further down but **no code exists for it yet**; see
+[Sprint 2 — Interview, Hiring & Management](#sprint-2--interview-hiring--management-not-started).
+
+> 🛠 **Building the rest?** [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md) is the
+> step-by-step implementation playbook for everything still outstanding — 22
+> ordered steps across 7 phases, each with its deliverables, API contract,
+> definition of done, and a ready-to-paste prompt for Claude Code. This README
+> describes what exists; that file describes how to build what doesn't.
+
 ## Step 0: HR Login
 
 This stage implements only the authentication foundation: an HR login page,
@@ -137,6 +180,13 @@ Source of truth: [`backend/src/config/vacancyOptions.js`](backend/src/config/vac
 
 ## PB-02: HR Publishes a Job Vacancy
 
+> ⚠️ **Spec update pending.** This step currently implements the *old* design
+> (HR copies a public link and shares it manually). The current backlog
+> replaces manual sharing with a public **Applicant Portal** listing — the
+> underlying `DRAFT -> PUBLISHED` transition below is still correct and does
+> not need to change, but a vacancy-listing endpoint/page still needs to be
+> added. See [Sprint 1 update](#sprint-1-update--public-applicant-portal).
+
 An HR user opens one of their **draft** vacancies and publishes it. Publishing
 is a one-way `DRAFT -> PUBLISHED` transition that generates a stable public
 application link. Applicant submission, CV upload and AI screening are later
@@ -231,6 +281,12 @@ the token, shows the vacancy, and hosts the PB-03 application form.
    Copy the public link; open it in any browser (no login) to see the vacancy.
 
 ## PB-03: Applicant Submits a CV Application
+
+> ⚠️ **Spec update pending.** The submission flow below (form → validate →
+> upload CV → store) is unchanged. What changes is *how the applicant gets
+> here*: today the only way in is a link HR shares manually; the backlog now
+> expects the applicant to find the vacancy by browsing a public portal
+> listing first. See [Sprint 1 update](#sprint-1-update--public-applicant-portal).
 
 An **external applicant** — no account, no login — opens a published vacancy's
 public link (`apply.html#token=<public_token>`), reviews the role, fills a short
@@ -333,6 +389,84 @@ sync with the bucket's `file_size_limit` and `frontend/js/config.js`
 
 `cd backend && npm test` runs `backend/test/applicationValidation.test.js`
 (Node's built-in test runner) — field validation and CV magic-byte checks.
+
+## Sprint 1 update — public Applicant Portal
+
+The original Sprint 1 design made HR responsible for distributing every
+vacancy link by hand:
+
+```
+HR -> Create Vacancy -> Publish -> Get Public Link -> Copy Link
+   -> Manually share link -> Applicant opens link -> Apply
+```
+
+That's not a practical recruitment-portal design — HR shouldn't have to push a
+link out through email/WhatsApp/LinkedIn every time a role opens. The fix
+keeps everything else in Sprint 1 the same and only changes how an applicant
+*finds* a published vacancy:
+
+```
+HR -> Create Vacancy -> Publish Vacancy -> Applicant Portal
+   -> Applicant views vacancy -> Applicant applies
+```
+
+Published vacancies appear on a public, browsable **Applicant Portal**
+instead of (or in addition to) a token link that must be shared manually.
+
+### What does and doesn't change
+
+| PB | Change |
+|---|---|
+| PB-01 (create vacancy) | No change. |
+| PB-02 (publish vacancy) | HR still clicks **Publish**; the `DRAFT -> PUBLISHED` transition, `public_token` and `published_at` all stay as implemented. What's added: the vacancy must also become visible in a public **listing**, not just reachable by a token link. |
+| PB-03 (applicant applies) | No change to the submission form/flow. What's added: the applicant's entry point is browsing the portal and clicking a vacancy card, rather than only opening a link HR sent them. |
+| PB-04 → PB-08 | No change. |
+
+### Portal example (from the brief)
+
+```
+ALTRIUM CAREERS
+Open Positions
+────────────────────────
+Junior Software Engineer
+IT Department · Junior Level
+[View Job]
+────────────────────────
+Accountant
+Finance Department · Junior Level
+[View Job]
+```
+
+### Gap analysis — what's missing today
+
+- **Backend:** there is no list endpoint for published vacancies. `GET
+  /api/public/vacancies/:token` (`backend/src/controllers/public.controller.js`)
+  only resolves **one** vacancy by its private token; it can't back a
+  "browse all open roles" page. A new unauthenticated endpoint is needed,
+  e.g. `GET /api/public/vacancies` → public-safe fields for every
+  `status = 'published'` vacancy (same projection PB-02 already uses: no
+  `id`, `created_by`, or `public_token` leakage — a public listing needs a
+  stable, non-guessable-but-shareable identifier per card, most simply the
+  existing `public_token` used as the detail-page link).
+- **Frontend:** there is no public "careers" / portal page. `apply.html`
+  today assumes the applicant already has a `#token=` in the URL; nothing in
+  `frontend/*.html` lists open vacancies for someone arriving with no link at
+  all.
+- **Not required:** no applicant account system — the brief is explicit that
+  applicants still don't need to log in to browse or apply.
+
+### Suggested implementation shape
+
+1. `GET /api/public/vacancies` — unauthenticated, returns published vacancies
+   only, same public-safe field set as the existing token endpoint, ordered
+   by `published_at desc`.
+2. A new public page (e.g. `frontend/portal.html` + `portal.css` +
+   `portalPage.js`) — the unauthenticated landing page that lists cards and
+   links each one to `apply.html#token=<public_token>` (reuse the existing
+   apply flow unchanged).
+3. Keep the direct token link working (HR can still share it if they want to,
+   e.g. sponsored posts) — the portal is an additional, primary discovery
+   path, not a replacement for the URL scheme already built.
 
 ## PB-04 (partial): HR reviews applications
 
@@ -547,6 +681,23 @@ review page share.
   CV-unavailable states, "recommendations only" disclaimer).
 - `vacancy.html` — the published panel gains a **View AI screening** link.
 
+## PB-07 & PB-08 — not yet implemented
+
+Both are the last pieces of Sprint 1 and are currently **not started**:
+
+- **PB-07 — HR selects candidates for interviews.** This is the bridge
+  between Sprint 1 and Sprint 2: HR reviews the AI-ranked, human-checked
+  applicants from PB-06 and picks who moves forward. It needs an application
+  status transition (e.g. `submitted -> shortlisted`/`selected`) that nothing
+  currently writes — PB-06 is deliberately read-only today. Once PB-07
+  exists, "selected candidate" is the input to PB-09 (interview level
+  selection) in Sprint 2.
+- **PB-08 — HR closes a job vacancy.** A `PUBLISHED -> CLOSED` transition
+  (mirroring the `DRAFT -> PUBLISHED` one PB-02 already implements), after
+  which the vacancy should stop accepting new applications and drop off the
+  Applicant Portal listing (see the Sprint 1 update above) while still being
+  visible to HR.
+
 ## Project structure
 
 ```
@@ -663,13 +814,248 @@ There is nothing machine-specific to change:
 
 Done: Step 0 (HR Login), PB-01 (Create Job Vacancy — draft), PB-02 (Publish
 Vacancy — public link generated), PB-03 (Applicant submits a CV application),
-PB-04 partial (HR reviews the application list + opens CVs), PB-05 (AI-assisted
+PB-04 (HR reviews the application list + opens CVs), PB-05 (AI-assisted
 CV screening — score, recommendation, matched/missing skills, summary stored per
 application; advisory only), PB-06 (HR reviews the AI-filtered applicants —
 ranked AI Screening list + read-only Applicant Review with secure CV access).
 
-Not yet implemented: PB-07 candidate selection, PB-08 vacancy closing.
-Application `status` stays `submitted` — neither the AI screening pipeline nor
-PB-06 changes it, and no HR status transitions exist yet.
+Still to do, in rough order — each links to its build step in
+[`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md):
+
+- [ ] **PB-02/PB-03 update** (plan Steps 1.1 + 1.2) — public `GET /api/public/vacancies` list
+  endpoint + a public Applicant Portal listing page, so applicants discover
+  vacancies by browsing instead of only via a manually shared link (see
+  [Sprint 1 update](#sprint-1-update--public-applicant-portal)).
+- [ ] **PB-07** (plan Step 1.3) — HR selects candidates for interviews (new
+  application status transition; this is the bridge into Sprint 2).
+- [ ] **PB-08** (plan Step 1.4) — HR closes a job vacancy (`PUBLISHED ->
+  CLOSED`; removes it from the Applicant Portal).
+
+Application `status` stays `submitted` today — neither the AI screening
+pipeline nor PB-06 changes it, and no HR status transitions exist yet.
+
+## Sprint 2 — Interview, Hiring & Management (not started)
+
+Sprint 2 takes an HR-selected candidate (PB-07) through a configurable,
+per-vacancy interview process, schedules interviews against real employee
+availability, collects structured interviewer evaluations, and lets a Hiring
+Manager make the final call. **None of this is implemented yet** — no tables,
+no routes, no pages. This section is the full spec to build against, carried
+over from the updated product backlog.
+
+**To build it:** [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md) Phases 2–6 break
+this spec into 13 ordered steps (schema → API → UI per capability), each with a
+copy-paste prompt. Start with plan Step 2.1 (roles) and 2.2 (interview process
+schema) — everything else depends on those two.
+
+### How Sprint 1 hands off to Sprint 2
+
+```
+Applicant -> Application -> CV -> AI Screening -> HR Review -> Candidate Selected   (Sprint 1, PB-07)
+Candidate Selected -> Interview Process -> Interviews -> Interview Results
+   -> Hiring Manager -> Hire / Reject                                              (Sprint 2)
+```
+
+### PB-09 — HR selects the candidate's interview level
+
+After PB-07 selects a candidate, HR picks an interview level:
+**Internship/Entry, Junior, Mid-Level, or Senior**. The level drives which
+default interview stages load next (PB-10) — an internship candidate doesn't
+need the same process as a senior hire.
+
+### PB-10 — System displays default interview stages
+
+Given a vacancy + level, the system loads a default stage list. Defaults are
+**per vacancy**, not hard-coded per level — e.g. "Junior" for a Software
+Engineer role might default to `HR/Behavioural -> Technical -> Hiring
+Manager`, while "Junior" for an Accountant role might default to
+`HR/Behavioural -> Accounting Knowledge -> Hiring Manager`. Do not hard-code
+`Junior = Technical Interview` globally.
+
+### PB-11 — HR customizes the interview stages
+
+Defaults are a starting point, not a fixed process. HR can:
+
+- **Add** a stage (e.g. insert a System Design round)
+- **Remove** a stage
+- **Reorder** stages (move up / move down)
+
+`Default → HR customizes → Final interview process` per vacancy+candidate.
+
+### PB-12 — HR configures each interview stage
+
+For every stage, HR sets who's allowed to interview:
+
+- Department (e.g. IT)
+- Minimum seniority (e.g. Senior)
+- Number of interviewers required (usually 1; see the two-interviewer note
+  below)
+- Duration (e.g. 60 minutes)
+
+Example: *Technical Interview → IT dept, Senior+, 1 interviewer, 60 min* means
+"find an existing IT employee with Senior-level experience."
+
+**What is an interviewer?** Not a separate account/role — any existing
+employee. When HR assigns an employee to a stage, that employee *becomes* the
+interviewer for that one interview. No duplicate accounts, no new login.
+
+```
+EMPLOYEE -> assigned to an interview -> INTERVIEWER (for that interview only)
+```
+
+### PB-13 — Interviewer manages availability
+
+An employee (e.g. a Senior Software Engineer with existing dev work,
+meetings, etc.) logs into their **existing** account and opens an *Interview
+Availability Calendar* to add slots (date + start time + end time), and can
+hold multiple slots across multiple days. This is self-service so HR isn't
+manually chasing "are you free Wednesday?" over chat.
+
+### PB-14 — HR views interviewer availability
+
+When scheduling a stage, HR sees which employees matching that stage's
+requirements (PB-12) are available and when, via a scheduling calendar.
+**Important:** availability must be checked against *already-scheduled
+interviews too*, not just the raw slots the employee marked — otherwise two
+candidates could get double-booked into the same interviewer/hour. Booked
+time should show as unavailable even inside a marked-available window.
+
+### PB-15 — HR assigns an interviewer
+
+HR picks a suitable, available employee and assigns them to the
+candidate+stage. This creates the relationship
+`Interviewer -> assigned to -> Stage -> Candidate`.
+
+Some stages may need **two interviewers** (e.g. a System Design round with a
+Senior Engineer + a Technical Lead) — scheduling then needs a time where
+*both* are available (the overlap of their slots). This is a stretch goal:
+build the schema so it's supported, but shipping single-interviewer
+assignment first is acceptable if time is short.
+
+### PB-16 — HR schedules the interview
+
+Once candidate + stage + interviewer + date + time are all chosen, HR clicks
+**Schedule Interview**, which stores a scheduled `Interview` row (status
+`scheduled`).
+
+### PB-17 — System sends interview notifications
+
+On scheduling, both sides get notified:
+
+- **Candidate:** role, stage, date, time.
+- **Interviewer:** candidate name, stage, date, time.
+
+HR can also see the scheduled interview from their side.
+
+### PB-18 — Interviewer views assigned interviews
+
+The employee's existing dashboard gains an "Upcoming Interviews" panel
+(candidate, position, stage, date/time, a "View Interview" action). No new
+account needed — same login as PB-13.
+
+### PB-19 — Interviewer records interview ratings and feedback
+
+After conducting the interview, the interviewer submits a **structured**
+evaluation rather than a single good/bad flag — per-dimension ratings (e.g.
+Technical Knowledge, Problem Solving, Communication, Role Knowledge, each out
+of 5), an overall rating, and free-text comments. This is the interviewer's
+last responsibility in the flow; everything after this belongs to the Hiring
+Manager.
+
+### PB-20 — Hiring Manager reviews interview results and candidate progress
+
+The Hiring Manager's dashboard lists candidates currently in process per
+vacancy, with the AI score (PB-05) alongside every completed stage's rating
+(HR interview, Technical, System Design, etc.). Drilling into a candidate
+shows, per stage: interviewer, rating, comments, status.
+
+### PB-21 — Hiring Manager makes the final hiring decision
+
+A binary decision — **Hire** or **Reject** — sets `Candidate Status` to
+`HIRED` or `REJECTED`.
+
+### PB-22 — System sends the final decision to HR and the candidate
+
+- HR is told the outcome (hired/not selected) plainly.
+- The candidate gets a simple congratulations/thank-you message.
+- The candidate must **never** see internal data: other candidates' scores,
+  AI ranking, interviewer comments, or internal HR notes.
+
+### PB-23 — Management views recruitment dashboard and pipeline
+
+A funnel view of the whole process for a period, e.g.
+`Applications -> AI Screening -> HR Selected -> Interviews -> Final Review -> Hired/Rejected`,
+plus summary cards (Open Vacancies, Applications, Shortlisted, Interviews,
+Hired, Rejected).
+
+### PB-24 — Management generates recruitment reports
+
+A report (vacancies created, applications, AI-shortlisted, HR-selected,
+interviews completed, hired, rejected) for a given period. Export format
+(PDF/Excel/on-screen only) is left to the team's capacity — nothing here
+requires a specific format.
+
+### Database shape for Sprint 2
+
+These are the relationships to design around, not a final migration —
+finalize exact types/constraints when Sprint 2 work starts (following the
+`00N_description.sql` numbering already used in `backend/sql/`).
+
+| Table | Key columns | Purpose |
+|---|---|---|
+| `employees` | `employee_id`, `name`, `email`, `department`, `job_position`, `seniority_level` | The existing workforce; interviewers are employees, not a separate account type. Likely maps onto (or extends) the existing `profiles` table rather than being wholly new. |
+| `interview_stages` | `stage_id`, `stage_name`, `description` | Reusable stage catalogue (HR/Behavioural, Technical, System Design, …). |
+| `vacancy_interview_stages` | `id`, `vacancy_id`, `stage_id`, `stage_order` | The **per-vacancy, per-candidate** ordered stage list — what makes PB-10/11 possible without hard-coding stages per level. |
+| `interviewer_requirements` | `id`, `stage_id`, `department`, `minimum_seniority`, `required_number` | PB-12 — what kind of employee a stage needs; drives the PB-14 search. |
+| `interview_availability` | `availability_id`, `employee_id`, `date`, `start_time`, `end_time` | PB-13 — self-service slots; powers the PB-14 calendar. |
+| `interviews` | `interview_id`, `candidate_id`, `vacancy_id`, `stage_id`, `interviewer_id`, `date`, `start_time`, `end_time`, `status` | PB-15/16 — the scheduled event connecting candidate + vacancy + stage + interviewer + time. |
+| `interview_evaluations` | `evaluation_id`, `interview_id`, `interviewer_id`, `technical_rating`, `problem_solving_rating`, `communication_rating`, `overall_rating`, `comments` | PB-19 — the interviewer's structured result. |
+| `hiring_decisions` | `decision_id`, `candidate_id`, `hiring_manager_id`, `decision`, `decision_date` | PB-21 — the final Hire/Reject record. |
+
+### Full Sprint 2 pipeline
+
+```
+SELECT INTERVIEW LEVEL (PB-09)
+        |
+LOAD DEFAULT STAGES (PB-10)
+        |
+HR CUSTOMIZES STAGES (PB-11)
+        |
+CONFIGURE EACH STAGE / INTERVIEWER REQUIREMENTS (PB-12)
+        |
+FIND SUITABLE EMPLOYEES -> CHECK AVAILABILITY CALENDAR (PB-13/14)
+        |
+ASSIGN INTERVIEWER (PB-15)
+        |
+SCHEDULE INTERVIEW (PB-16)
+        |
+NOTIFICATION (PB-17) -> candidate + interviewer
+        |
+CONDUCT INTERVIEW -> RATING + COMMENTS -> SUBMIT EVALUATION (PB-18/19)
+        |
+========================================================
+HIRING MANAGER REVIEWS RESULTS + PIPELINE (PB-20)
+        |
+FINAL HIRING DECISION: HIRE / REJECT (PB-21)
+        |
+NOTIFY HR + CANDIDATE (PB-22)
+        |
+MANAGEMENT DASHBOARD: PIPELINE (PB-23) + REPORTS (PB-24)
+```
+
+### Suggested developer split (from the brief)
+
+- **Applicant/HR side** — Sprint 1 (as built) plus the Sprint 2 HR flows:
+  select candidate/level, view/add/remove/reorder stages, configure each
+  stage, find interviewers, view availability, assign, schedule.
+- **Employee/Interviewer side** — availability calendar (add/edit), view
+  assigned interviews, view candidate/interview detail, submit evaluation.
+  Reuses the existing employee/HR login — no new account type.
+- **Hiring Manager side** — dashboard, candidate pipeline, candidate detail,
+  interview results + interviewer feedback, final decision (hire/reject).
+- **Dashboard / Reporting / Integration** — wires Applications → AI Results →
+  HR Selection → Interviews → Evaluations → Hiring Decisions into the
+  recruitment dashboard, candidate pipeline, and recruitment reports
+  (PB-23/24).
 
 

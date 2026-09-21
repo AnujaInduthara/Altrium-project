@@ -36,7 +36,15 @@
       "Bash(node -e \"require\\('./src/config/aiOptions'\\).isScreeningConfigured\\(\\) && console.log\\('screening: ACTIVE'\\)\")",
       "Bash(node -e \"require\\('./src/routes/vacancy.routes'\\); require\\('./src/controllers/screening.controller'\\); console.log\\('routes+controller load OK'\\)\")",
       "Bash(PORT=5099 node -e ' *)",
-      "Bash(node --check frontend/js/pages/aiScreeningPage.js)"
+      "Bash(node --check frontend/js/pages/aiScreeningPage.js)",
+      "Bash(node --check js/pages/aiScreeningPage.js)",
+      "Bash(node --check js/pages/vacancyPage.js)",
+      "Bash(node --check js/pages/createVacancyPage.js)",
+      "Bash(node \"C:/Users/kavee/AppData/Local/Temp/claude/c--Chan-Inside-Profile-personal-Altrium-project/92b3fcd5-7117-4659-9f4d-6b1c61be00a7/scratchpad/diag.js\")",
+      "Bash(cp \"C:/Users/kavee/AppData/Local/Temp/claude/c--Chan-Inside-Profile-personal-Altrium-project/92b3fcd5-7117-4659-9f4d-6b1c61be00a7/scratchpad/diag.js\" \"c:/Chan-Inside/Profile/personal/Altrium-project/backend/__diag_tmp.js\")",
+      "Bash(node __diag_tmp.js)",
+      "Bash(rm \"c:/Chan-Inside/Profile/personal/Altrium-project/backend/__diag_tmp.js\")",
+      "Bash(rm __diag_tmp.js)"
     ]
   }
 }

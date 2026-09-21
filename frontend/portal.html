@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Careers — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <main class="portal">
+    <a class="brand portal__brand" href="index.html" aria-label="Altrium home">
+      <img class="brand__logo" src="assets/icons/altrium-logo.png" alt="Altrium" />
+    </a>
+
+    <header class="portal__header">
+      <h1 class="heading-xl">Open Positions</h1>
+      <p class="text-muted">
+        Browse current openings at Altrium and apply directly — no account
+        needed.
+      </p>
+    </header>
+
+    <div class="portal__filters">
+      <div class="field field--plain portal__search">
+        <label class="field__label visually-hidden" for="portal-search">Search open positions</label>
+        <div class="field__control">
+          <input
+            class="field__input"
+            type="search"
+            id="portal-search"
+            placeholder="Search by title or department"
+            autocomplete="off"
+          />
+        </div>
+      </div>
+
+      <div class="field field--plain field--select portal__department">
+        <label class="field__label visually-hidden" for="portal-department">Department</label>
+        <div class="field__control">
+          <select class="field__input" id="portal-department">
+            <option value="">All departments</option>
+          </select>
+          <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <p class="status-message" id="portal-loading" role="status">Loading open positions…</p>
+
+    <div class="card portal__state" id="portal-empty" hidden>
+      <p class="text-muted">No open positions right now. Please check back later.</p>
+    </div>
+
+    <div class="card portal__state" id="portal-error" hidden>
+      <p class="text-muted">
+        We couldn't load open positions right now. Please check your connection
+        and try again.
+      </p>
+      <p>
+        <button type="button" class="button button--primary" id="portal-retry">
+          Try again
+        </button>
+      </p>
+    </div>
+
+    <ul class="portal__list" id="portal-list" hidden></ul>
+
+    <footer class="portal__footer">© 2025 Altrium Solutions. All rights reserved.</footer>
+  </main>
+
+  <script type="module" src="js/pages/portalPage.js"></script>
+</body>
+</html>
