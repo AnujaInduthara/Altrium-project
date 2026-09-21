@@ -1,5 +1,48 @@
 # Altrium — Recruitment Management Platform
 
+## Backlog status at a glance
+
+| ID | Item | Sprint | Status |
+|---|---|---|---|
+| Step 0 | HR login (Supabase Auth + HR authorization) | 1 | ✅ Done |
+| PB-01 | HR creates a job vacancy | 1 | ✅ Done |
+| PB-02 | HR publishes a job vacancy | 1 | ⚠️ Update needed — see [Sprint 1 update](#sprint-1-update--public-applicant-portal) |
+| PB-03 | Applicant views and submits a job application | 1 | ⚠️ Update needed — see [Sprint 1 update](#sprint-1-update--public-applicant-portal) |
+| PB-04 | System stores submitted applications | 1 | ✅ Done |
+| PB-05 | System filters CVs using AI | 1 | ✅ Done |
+| PB-06 | HR reviews AI-filtered applicants | 1 | ✅ Done |
+| PB-07 | HR selects candidates for interviews | 1 | ❌ Not started |
+| PB-08 | HR closes a job vacancy | 1 | ❌ Not started |
+| PB-09 | HR selects the candidate's interview level | 2 | ❌ Not started |
+| PB-10 | System displays default interview stages | 2 | ❌ Not started |
+| PB-11 | HR customizes the interview stages | 2 | ❌ Not started |
+| PB-12 | HR configures interviewer requirements per stage | 2 | ❌ Not started |
+| PB-13 | Interviewer manages availability via calendar | 2 | ❌ Not started |
+| PB-14 | HR views interviewer availability | 2 | ❌ Not started |
+| PB-15 | HR assigns available interviewers | 2 | ❌ Not started |
+| PB-16 | HR schedules interviews | 2 | ❌ Not started |
+| PB-17 | System sends interview notifications | 2 | ❌ Not started |
+| PB-18 | Interviewer views assigned interviews | 2 | ❌ Not started |
+| PB-19 | Interviewer records ratings and feedback | 2 | ❌ Not started |
+| PB-20 | Hiring Manager reviews interview results | 2 | ❌ Not started |
+| PB-21 | Hiring Manager makes the final hiring decision | 2 | ❌ Not started |
+| PB-22 | System sends the final decision to HR + candidate | 2 | ❌ Not started |
+| PB-23 | Management views recruitment dashboard/pipeline | 2 | ❌ Not started |
+| PB-24 | Management generates recruitment reports | 2 | ❌ Not started |
+
+Sprint 1's original design had HR copy a vacancy's public link and share it
+manually. That is being replaced with a public **Applicant Portal** listing —
+see [Sprint 1 update](#sprint-1-update--public-applicant-portal) below for
+exactly what changes and what's still missing. Sprint 2 (PB-09…PB-24) is fully
+specced further down but **no code exists for it yet**; see
+[Sprint 2 — Interview, Hiring & Management](#sprint-2--interview-hiring--management-not-started).
+
+> 🛠 **Building the rest?** [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md) is the
+> step-by-step implementation playbook for everything still outstanding — 22
+> ordered steps across 7 phases, each with its deliverables, API contract,
+> definition of done, and a ready-to-paste prompt for Claude Code. This README
+> describes what exists; that file describes how to build what doesn't.
+
 ## Step 0: HR Login
 
 This stage implements only the authentication foundation: an HR login page,
@@ -137,6 +180,13 @@ Source of truth: [`backend/src/config/vacancyOptions.js`](backend/src/config/vac
 
 ## PB-02: HR Publishes a Job Vacancy
 
+> ⚠️ **Spec update pending.** This step currently implements the *old* design
+> (HR copies a public link and shares it manually). The current backlog
+> replaces manual sharing with a public **Applicant Portal** listing — the
+> underlying `DRAFT -> PUBLISHED` transition below is still correct and does
+> not need to change, but a vacancy-listing endpoint/page still needs to be
+> added. See [Sprint 1 update](#sprint-1-update--public-applicant-portal).
+
 An HR user opens one of their **draft** vacancies and publishes it. Publishing
 is a one-way `DRAFT -> PUBLISHED` transition that generates a stable public
 application link. Applicant submission, CV upload and AI screening are later
@@ -231,6 +281,12 @@ the token, shows the vacancy, and hosts the PB-03 application form.
    Copy the public link; open it in any browser (no login) to see the vacancy.
 
 ## PB-03: Applicant Submits a CV Application
+
+> ⚠️ **Spec update pending.** The submission flow below (form → validate →
+> upload CV → store) is unchanged. What changes is *how the applicant gets
+> here*: today the only way in is a link HR shares manually; the backlog now
+> expects the applicant to find the vacancy by browsing a public portal
+> listing first. See [Sprint 1 update](#sprint-1-update--public-applicant-portal).
 
 An **external applicant** — no account, no login — opens a published vacancy's
 public link (`apply.html#token=<public_token>`), reviews the role, fills a short
@@ -333,6 +389,84 @@ sync with the bucket's `file_size_limit` and `frontend/js/config.js`
 
 `cd backend && npm test` runs `backend/test/applicationValidation.test.js`
 (Node's built-in test runner) — field validation and CV magic-byte checks.
+
+## Sprint 1 update — public Applicant Portal
+
+The original Sprint 1 design made HR responsible for distributing every
+vacancy link by hand:
+
+```
+HR -> Create Vacancy -> Publish -> Get Public Link -> Copy Link
+   -> Manually share link -> Applicant opens link -> Apply
+```
+
+That's not a practical recruitment-portal design — HR shouldn't have to push a
+link out through email/WhatsApp/LinkedIn every time a role opens. The fix
+keeps everything else in Sprint 1 the same and only changes how an applicant
+*finds* a published vacancy:
+
+```
+HR -> Create Vacancy -> Publish Vacancy -> Applicant Portal
+   -> Applicant views vacancy -> Applicant applies
+```
+
+Published vacancies appear on a public, browsable **Applicant Portal**
+instead of (or in addition to) a token link that must be shared manually.
+
+### What does and doesn't change
+
+| PB | Change |
+|---|---|
+| PB-01 (create vacancy) | No change. |
+| PB-02 (publish vacancy) | HR still clicks **Publish**; the `DRAFT -> PUBLISHED` transition, `public_token` and `published_at` all stay as implemented. What's added: the vacancy must also become visible in a public **listing**, not just reachable by a token link. |
+| PB-03 (applicant applies) | No change to the submission form/flow. What's added: the applicant's entry point is browsing the portal and clicking a vacancy card, rather than only opening a link HR sent them. |
+| PB-04 → PB-08 | No change. |
+
+### Portal example (from the brief)
+
+```
+ALTRIUM CAREERS
+Open Positions
+────────────────────────
+Junior Software Engineer
+IT Department · Junior Level
+[View Job]
+────────────────────────
+Accountant
+Finance Department · Junior Level
+[View Job]
+```
+
+### Gap analysis — what's missing today
+
+- **Backend:** there is no list endpoint for published vacancies. `GET
+  /api/public/vacancies/:token` (`backend/src/controllers/public.controller.js`)
+  only resolves **one** vacancy by its private token; it can't back a
+  "browse all open roles" page. A new unauthenticated endpoint is needed,
+  e.g. `GET /api/public/vacancies` → public-safe fields for every
+  `status = 'published'` vacancy (same projection PB-02 already uses: no
+  `id`, `created_by`, or `public_token` leakage — a public listing needs a
+  stable, non-guessable-but-shareable identifier per card, most simply the
+  existing `public_token` used as the detail-page link).
+- **Frontend:** there is no public "careers" / portal page. `apply.html`
+  today assumes the applicant already has a `#token=` in the URL; nothing in
+  `frontend/*.html` lists open vacancies for someone arriving with no link at
+  all.
+- **Not required:** no applicant account system — the brief is explicit that
+  applicants still don't need to log in to browse or apply.
+
+### Suggested implementation shape
+
+1. `GET /api/public/vacancies` — unauthenticated, returns published vacancies
+   only, same public-safe field set as the existing token endpoint, ordered
+   by `published_at desc`.
+2. A new public page (e.g. `frontend/portal.html` + `portal.css` +
+   `portalPage.js`) — the unauthenticated landing page that lists cards and
+   links each one to `apply.html#token=<public_token>` (reuse the existing
+   apply flow unchanged).
+3. Keep the direct token link working (HR can still share it if they want to,
+   e.g. sponsored posts) — the portal is an additional, primary discovery
+   path, not a replacement for the URL scheme already built.
 
 ## PB-04 (partial): HR reviews applications
 
@@ -869,6 +1003,29 @@ with secure CV access), PB-07 (HR selects candidates — explicit, confirmed
 `PUBLISHED → CLOSED`; recruitment data preserved, new public applications
 blocked).
 
+HIRING MANAGER REVIEWS RESULTS + PIPELINE (PB-20)
+        |
+FINAL HIRING DECISION: HIRE / REJECT (PB-21)
+        |
+NOTIFY HR + CANDIDATE (PB-22)
+        |
+MANAGEMENT DASHBOARD: PIPELINE (PB-23) + REPORTS (PB-24)
+```
+
+### Suggested developer split (from the brief)
+
+- **Applicant/HR side** — Sprint 1 (as built) plus the Sprint 2 HR flows:
+  select candidate/level, view/add/remove/reorder stages, configure each
+  stage, find interviewers, view availability, assign, schedule.
+- **Employee/Interviewer side** — availability calendar (add/edit), view
+  assigned interviews, view candidate/interview detail, submit evaluation.
+  Reuses the existing employee/HR login — no new account type.
+- **Hiring Manager side** — dashboard, candidate pipeline, candidate detail,
+  interview results + interviewer feedback, final decision (hire/reject).
+- **Dashboard / Reporting / Integration** — wires Applications → AI Results →
+  HR Selection → Interviews → Evaluations → Hiring Decisions into the
+  recruitment dashboard, candidate pipeline, and recruitment reports
+  (PB-23/24).
 The AI screening pipeline still never changes `applications.status`; the HR
 status transitions are PB-07's `submitted → selected` (applications) and PB-08's
 `published → closed` (vacancies).

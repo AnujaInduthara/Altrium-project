@@ -20,6 +20,9 @@ const submitLimiter = createRateLimiter({
   message: 'You have submitted several applications recently. Please try again later.',
 });
 
+// Registered before the /:token route so it can't be shadowed by it.
+router.get('/vacancies', lookupLimiter, publicController.listPublishedVacancies);
+
 router.get('/vacancies/:token', lookupLimiter, publicController.getPublishedVacancy);
 
 router.post(
