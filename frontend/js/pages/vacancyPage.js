@@ -24,6 +24,7 @@ const errorEl = document.getElementById('detail-error');
 const detailEl = document.getElementById('vacancy-detail');
 const alert = createAlert(document.getElementById('detail-alert'));
 const modal = createModal(document.getElementById('publish-modal'));
+const closeModal = createModal(document.getElementById('close-modal'));
 
 const vacancyId = readParam('id');
 
@@ -113,7 +114,13 @@ function render(vacancy) {
     );
   }
 
+  text(
+    'closed-at-hint',
+    isClosed && vacancy.closed_at ? `Closed ${formatDateTime(vacancy.closed_at)}.` : ''
+  );
+
   $('publish-modal-body').textContent = `Are you sure you want to publish “${vacancy.job_title}”?`;
+  $('close-modal-body').textContent = `Are you sure you want to close “${vacancy.job_title}”?`;
 
   loadingEl.hidden = true;
   errorEl.hidden = true;
@@ -200,6 +207,69 @@ async function doPublish() {
   }
 }
 
+// --- Close vacancy (PB-08) ---------------------------------------------------
+
+function setClosing(on) {
+  closing = on;
+  const confirmBtn = $('confirm-close-btn');
+  confirmBtn.disabled = on;
+  confirmBtn.setAttribute('aria-busy', String(on));
+  confirmBtn.querySelector('[data-label]').textContent = on ? 'Closing…' : 'Yes, Close Vacancy';
+  // Prevent a second close attempt from the panel button while one is running.
+  $('close-btn').disabled = on;
+}
+
+function messageForCloseStatus(status, body) {
+  const apiMessage = body?.error?.message;
+  switch (status) {
+    case 403:
+      return apiMessage || 'You do not have permission to close this vacancy.';
+    case 404:
+      return apiMessage || 'This vacancy could not be found.';
+    case 409:
+      return apiMessage || 'This vacancy can no longer be closed.';
+    default:
+      return apiMessage || 'Unable to close the vacancy. Please try again.';
+  }
+}
+
+async function doClose() {
+  if (closing) return;
+  alert.hide();
+  setClosing(true);
+
+  try {
+    const { ok, status, body } = await VacancyService.close(vacancyId);
+
+    if (ok) {
+      closeModal.close();
+      render(body.data);
+      alert.success('Job vacancy closed successfully.');
+      return;
+    }
+
+    if (status === 401) {
+      await AuthService.signOut();
+      window.location.replace(LOGIN_PAGE);
+      return;
+    }
+
+    closeModal.close();
+    alert.error(messageForCloseStatus(status, body));
+
+    // For state conflicts / not-found, reload the true state so the UI is honest
+    // about whether the vacancy is already closed.
+    if (status === 409 || status === 404) {
+      await loadVacancy();
+    }
+  } catch (err) {
+    closeModal.close();
+    alert.error('Unable to close the vacancy. Please check your connection and try again.');
+  } finally {
+    setClosing(false);
+  }
+}
+
 async function copyLink() {
   const url = $('public-url').value;
   if (!url) return;
@@ -262,6 +332,8 @@ function wireOnce() {
   $('status-toggle').addEventListener('click', onToggleClick);
   $('publish-btn').addEventListener('click', () => modal.open());
   $('confirm-publish-btn').addEventListener('click', doPublish);
+  $('close-btn').addEventListener('click', () => closeModal.open());
+  $('confirm-close-btn').addEventListener('click', doClose);
   $('copy-btn').addEventListener('click', copyLink);
 }
 

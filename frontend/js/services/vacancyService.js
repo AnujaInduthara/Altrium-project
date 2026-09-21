@@ -49,4 +49,15 @@ export const VacancyService = {
     });
     return toResult(response);
   },
+
+  // PUBLISHED -> CLOSED (PB-08). One-way; no request body. The server controls
+  // status / closed_at / closed_by and rejects any transition that is not
+  // published -> closed.
+  async close(id) {
+    const response = await fetch(`${base}/${encodeURIComponent(id)}/close`, {
+      method: 'POST',
+      headers: await authHeaders(),
+    });
+    return toResult(response);
+  },
 };

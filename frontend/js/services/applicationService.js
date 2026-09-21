@@ -78,4 +78,20 @@ export const ApplicationService = {
     );
     return toResult(response);
   },
+
+  // PB-07: HR selects applicants to proceed as candidates. `applicationIds` is
+  // an array of application ids that must all belong to `vacancyId`. The server
+  // authenticates the HR user, checks vacancy ownership, verifies every id, and
+  // performs an atomic, idempotent 'submitted' -> 'selected' transition.
+  async selectCandidates(vacancyId, applicationIds) {
+    const response = await fetch(
+      `${apiBase}/vacancies/${encodeURIComponent(vacancyId)}/candidates/select`,
+      {
+        method: 'POST',
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ applicationIds }),
+      }
+    );
+    return toResult(response);
+  },
 };

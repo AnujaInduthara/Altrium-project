@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Select Candidates — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app" data-active-nav="candidates">
+    <section class="page" id="candidates-page" hidden>
+      <header class="page-header">
+        <h1 class="page-header__title">Select Candidates</h1>
+        <p class="page-header__subtitle">
+          Choose the applicants who should proceed to the interview process. AI
+          screening is advisory only — this selection is the HR decision.
+        </p>
+      </header>
+
+      <ol class="workflow-steps" aria-label="Recruitment workflow">
+        <li class="workflow-steps__step is-done">Applicant</li>
+        <li class="workflow-steps__step is-done">AI screened</li>
+        <li class="workflow-steps__step is-done">HR review</li>
+        <li class="workflow-steps__step is-current" aria-current="step">Select candidates</li>
+        <li class="workflow-steps__step">Candidate</li>
+      </ol>
+
+      <div class="alert" id="candidates-alert" role="alert" aria-live="assertive" hidden></div>
+
+      <div class="card candidates-toolbar">
+        <div class="field field--plain field--select candidates-toolbar__field" data-field="vacancy">
+          <label class="field__label" for="vacancy-select">Vacancy</label>
+          <div class="field__control">
+            <select class="field__input" id="vacancy-select">
+              <option value="">Select a vacancy…</option>
+            </select>
+            <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <p class="candidates-vacancy" id="candidates-vacancy" hidden></p>
+
+      <p class="status-message" id="candidates-loading" role="status" hidden>Loading applicants…</p>
+
+      <div class="card empty-state" id="candidates-prompt">
+        <h2 class="heading-lg">Select a vacancy</h2>
+        <p class="text-muted">Choose one of your vacancies above to select candidates from its applicants.</p>
+      </div>
+
+      <div class="card empty-state" id="candidates-empty" hidden>
+        <h2 class="heading-lg">No eligible applicants available for selection</h2>
+        <p class="text-muted">
+          Applicants appear here once they have applied. Already-selected
+          candidates are shown above.
+        </p>
+      </div>
+
+      <!-- Already-selected candidates (read-only) -->
+      <section class="card candidates-selected" id="selected-section" hidden>
+        <div class="card__header">
+          <h2 class="card__title">Selected candidates</h2>
+          <p class="card__subtitle" id="selected-count">These applicants have been selected by HR.</p>
+        </div>
+        <ul class="candidate-list" id="selected-list"></ul>
+      </section>
+
+      <!-- Eligible applicants (selectable) -->
+      <section class="card candidates-pool" id="pool-section" hidden>
+        <div class="card__header">
+          <h2 class="card__title">Applicants</h2>
+          <p class="card__subtitle">
+            Select one or more applicants, then confirm. AI score and rank are
+            shown to inform your decision, not to make it.
+          </p>
+        </div>
+
+        <ul class="candidate-list" id="pool-list"></ul>
+
+        <div class="selection-bar" id="selection-bar">
+          <p class="selection-bar__count" id="selection-count" aria-live="polite">0 applicants selected</p>
+          <div class="selection-bar__actions">
+            <button type="button" class="button button--ghost" id="cancel-btn">Cancel</button>
+            <button type="button" class="button button--primary" id="select-btn">Select Candidates</button>
+          </div>
+        </div>
+      </section>
+
+      <p class="candidates-note" id="candidates-note" hidden>
+        <strong>Note:</strong> AI recommendations do not determine the final
+        selection. Choosing "Select Candidates" records the HR decision and the
+        applicants become candidates for the next recruitment stage.
+      </p>
+    </section>
+  </div>
+
+  <!-- One selectable applicant row. -->
+  <template id="pool-row-template">
+    <li class="candidate-row">
+      <label class="candidate-row__select">
+        <input type="checkbox" class="candidate-row__checkbox" data-checkbox />
+        <span class="candidate-row__checkbox-box" aria-hidden="true"></span>
+        <span class="candidate-row__main">
+          <span class="candidate-row__name" data-name></span>
+          <span class="candidate-row__meta" data-meta></span>
+        </span>
+      </label>
+      <span class="candidate-row__score">
+        <span class="candidate-row__score-value" data-score hidden></span>
+        <span class="candidate-row__rank" data-rank hidden></span>
+        <span class="screening-chip" data-chip hidden></span>
+      </span>
+      <a class="candidate-row__view" data-view target="_blank" rel="noopener">View</a>
+    </li>
+  </template>
+
+  <!-- One already-selected candidate row (read-only). -->
+  <template id="selected-row-template">
+    <li class="candidate-row candidate-row--selected">
+      <span class="candidate-row__main">
+        <span class="candidate-row__name" data-name></span>
+        <span class="candidate-row__meta" data-meta></span>
+      </span>
+      <span class="candidate-row__score">
+        <span class="candidate-row__score-value" data-score hidden></span>
+        <span class="candidate-row__rank" data-rank hidden></span>
+      </span>
+      <span class="badge badge--success" data-selected-badge>Selected by HR</span>
+      <a class="candidate-row__view" data-view target="_blank" rel="noopener">View</a>
+    </li>
+  </template>
+
+  <!-- Confirmation dialog -->
+  <div class="modal" id="confirm-modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+      <h2 class="modal__title" id="confirm-modal-title">Confirm candidate selection</h2>
+      <p class="modal__body" id="confirm-modal-intro">You are about to select these applicants as candidates:</p>
+      <ul class="confirm-list" id="confirm-list"></ul>
+      <p class="modal__body text-sm text-muted">
+        These applicants will proceed as candidates for the next recruitment
+        stage. AI recommendations do not determine final selection — this action
+        represents the HR decision.
+      </p>
+      <div class="modal__actions">
+        <button type="button" class="button button--ghost" data-close>Cancel</button>
+        <button type="button" class="button button--primary" id="confirm-btn" data-autofocus>
+          <span data-label>Confirm Selection</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/candidatesPage.js"></script>
+</body>
+</html>

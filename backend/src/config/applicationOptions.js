@@ -37,9 +37,24 @@ const CV_TYPES = Object.freeze({
 
 const CV_EXTENSIONS = Object.freeze(Object.values(CV_TYPES).map((t) => t.ext));
 
-// PB-03 only ever creates 'submitted'. The rest are defined in the DB check
-// constraint for later backlog items.
-const APPLICATION_STATUS = Object.freeze({ SUBMITTED: 'submitted' });
+// Application lifecycle values (mirrors the DB check constraint in
+// sql/004_create_applications.sql). PB-03 only ever creates 'submitted';
+// PB-07 adds the 'submitted' -> 'selected' transition (HR selects a candidate).
+const APPLICATION_STATUS = Object.freeze({
+  SUBMITTED: 'submitted',
+  UNDER_REVIEW: 'under_review',
+  SHORTLISTED: 'shortlisted',
+  REJECTED: 'rejected',
+  SELECTED: 'selected',
+});
+
+// The only statuses a PB-07 candidate selection may transition FROM. Anything
+// else (already 'selected', 'rejected', …) is not eligible.
+const CANDIDATE_SELECTABLE_FROM = Object.freeze(['submitted']);
+
+// Upper bound on how many applications one selection request may carry. Well
+// above any realistic vacancy applicant count; guards against abuse / mistakes.
+const MAX_CANDIDATE_SELECTION = 200;
 
 const LIMITS = Object.freeze({
   FULL_NAME_MIN: 2,
@@ -65,6 +80,8 @@ module.exports = {
   CV_EXTENSIONS,
   CV_MAX_BYTES,
   APPLICATION_STATUS,
+  CANDIDATE_SELECTABLE_FROM,
+  MAX_CANDIDATE_SELECTION,
   LIMITS,
   DUPLICATE_WINDOW_MS,
   CV_BUCKET,

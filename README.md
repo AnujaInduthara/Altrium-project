@@ -681,22 +681,198 @@ review page share.
   CV-unavailable states, "recommendations only" disclaimer).
 - `vacancy.html` — the published panel gains a **View AI screening** link.
 
-## PB-07 & PB-08 — not yet implemented
+## PB-07: HR selects candidates
 
-Both are the last pieces of Sprint 1 and are currently **not started**:
+The **selection** stage. After reviewing the AI-screened applicants (PB-06), HR
+opens a vacancy's **Select Candidates** page, explicitly ticks the applicants who
+should proceed to the interview process, confirms, and those applications become
+**candidates**. The AI never makes this call — its score / rank / matched skills
+are shown to inform the decision, and are left completely untouched by it.
 
-- **PB-07 — HR selects candidates for interviews.** This is the bridge
-  between Sprint 1 and Sprint 2: HR reviews the AI-ranked, human-checked
-  applicants from PB-06 and picks who moves forward. It needs an application
-  status transition (e.g. `submitted -> shortlisted`/`selected`) that nothing
-  currently writes — PB-06 is deliberately read-only today. Once PB-07
-  exists, "selected candidate" is the input to PB-09 (interview level
-  selection) in Sprint 2.
-- **PB-08 — HR closes a job vacancy.** A `PUBLISHED -> CLOSED` transition
-  (mirroring the `DRAFT -> PUBLISHED` one PB-02 already implements), after
-  which the vacancy should stop accepting new applications and drop off the
-  Applicant Portal listing (see the Sprint 1 update above) while still being
-  visible to HR.
+A "candidate" is not a new entity: it is an application whose lifecycle has
+advanced `submitted → selected`. It keeps every relationship it already had —
+vacancy, CV, AI screening result.
+
+> **Migration required:** run
+> [`backend/sql/006_add_candidate_selection.sql`](backend/sql/006_add_candidate_selection.sql)
+> after `005`. It adds `selected_at` / `selected_by` to `applications` (plus an
+> audit check constraint and a `(vacancy_id, status)` index). `'selected'` was
+> already an allowed `status` value since migration `004`, so no data migration
+> is needed.
+
+### Flow
+
+```
+Vacancies → open a published vacancy → "Select candidates"
+      │      (or AI Screening / Candidates sidebar item → pick a vacancy)
+      ▼
+candidates.html#vacancy=<id>
+      │  GET /api/vacancies/:id/applications   (owner-checked; each row carries its `screening`)
+      ▼
+Eligible applicants (status 'submitted') shown with a checkbox + AI score + rank;
+already-selected candidates shown read-only above
+      │  tick applicants → "Select Candidates" → confirm in a dialog
+      ▼
+POST /api/vacancies/:id/candidates/select   { applicationIds: [...] }
+      │  authenticateUser → requireHR → getVacancyForUser (owner check)
+      │  → every id must belong to this vacancy AND be 'submitted'
+      │  → single atomic UPDATE ... WHERE id = ANY(:ids)
+      │       AND vacancy_id = :id AND status = 'submitted'
+      ▼
+200 { success: true, data: { selectedCount, newlySelectedCount, candidates: [...] } }
+      → success confirmation; the selected applicants now appear as candidates
+```
+
+### API
+
+| endpoint | notes |
+|---|---|
+| `POST /api/vacancies/:id/candidates/select` | **new.** HR only, owner-checked. Body `{ applicationIds: string[] }`. Transitions each `submitted` application to `selected`, recording `selected_by` (the authenticated HR user) and `selected_at` (server time). Returns the refreshed candidate list (selected applications + their AI screening summary). |
+| `GET /api/vacancies/:id/applications` | unchanged shape; each application row now also carries `selected_at` / `selected_by`, and the Select Candidates page reads it to separate eligible applicants from existing candidates. |
+
+| status | when |
+|---|---|
+| `200` | selection saved (idempotent — re-submitting the same set is safe, no duplicate candidates) |
+| `400` | `NO_APPLICATIONS_SELECTED` (empty selection), `INVALID_REQUEST` (malformed body), `TOO_MANY_APPLICATIONS`, or `INVALID_APPLICATION` (an id that is not one of this vacancy's applications — e.g. from another vacancy) |
+| `401` | missing / invalid / expired token |
+| `403` | authenticated but not HR |
+| `404` | `VACANCY_NOT_FOUND` — unknown vacancy, or one owned by another HR user (reported as 404 so nothing leaks) |
+| `409` | `APPLICATION_NOT_ELIGIBLE` — a selected id is `rejected` or otherwise not in a selectable state |
+
+### Security & data integrity
+
+- Every part of the operation is server-authorized: `authenticateUser` +
+  `requireHR`, then an explicit "caller owns the parent vacancy" check, then a
+  per-id check that each application belongs to that vacancy. The HR identity,
+  the vacancy ownership and the application–vacancy relationship are **never**
+  taken from the request body.
+- The write is one conditional `UPDATE` guarded by `status = 'submitted'`, so it
+  is atomic and **idempotent**: a double-click / retried request updates zero
+  rows for an already-selected applicant instead of creating a second candidate.
+- `application_screenings` (score, rank, matched / missing skills, summary,
+  timestamps) and the CV file + its metadata are **not touched** by selection.
+- RLS on `applications` is unchanged — enabled with no policies; this mutation is
+  backend-only via the service-role key, which never reaches the browser.
+
+### Frontend
+
+- `candidates.html` / `candidatesPage.js` / `css/pages/candidates.css` — **new**
+  Select Candidates screen: workflow step indicator, vacancy picker, a read-only
+  "Selected candidates" section, a checkbox list of eligible applicants (AI score
+  + rank shown, never auto-ticked), a live "N applicants selected" count,
+  Cancel / Select Candidates, a confirmation dialog, and loading / empty /
+  success / error / validation states.
+- `vacancy.html` and `ai-screening.html` gain a **Select candidates** link
+  (deep-linked to the chosen vacancy). The **Candidates** sidebar item now
+  resolves to this page.
+
+## PB-08: HR closes a job vacancy
+
+The **final Sprint-1 step**. When recruitment for a published vacancy no longer
+needs to accept new applications, HR opens it and clicks **Close Vacancy**,
+confirms in a dialog, and the vacancy moves `PUBLISHED → CLOSED`. Closing is a
+one-way workflow state change — **not** a deletion. Every existing application,
+CV, AI screening result and selected candidate is preserved and stays
+accessible to the owning HR user; only *new* public applications are blocked.
+
+> **Migration required:** run
+> [`backend/sql/007_add_vacancy_closing.sql`](backend/sql/007_add_vacancy_closing.sql)
+> after `006`. It adds `closed_at` / `closed_by` to `job_vacancies` plus a
+> `NOT VALID` audit check constraint. `'closed'` has been an allowed `status`
+> since migration `002`, so there is no data migration and existing rows stay
+> valid.
+
+### Flow
+
+```
+Vacancies → open a published vacancy (vacancy.html#id=<uuid>)
+      │  "Close Vacancy" → confirm in a modal
+      ▼
+POST /api/vacancies/:id/close   Authorization: Bearer <access_token>   (no body)
+      │  authenticateUser → requireHR → service:
+      │    exists? → owned by caller? → status == 'published'?
+      │    → conditional UPDATE ... SET status='closed', closed_at=now(),
+      │        closed_by=<hr> WHERE id=:id AND status='published'
+      ▼
+200 { success: true, data: { ..., status: "closed", closed_at, closed_by } }
+      → panel shows a "Closed" badge + "Closed <date>"; recruitment-data links stay
+```
+
+### Database (migration `007`)
+
+Adds to `public.job_vacancies`:
+
+| column | type | notes |
+|---|---|---|
+| `closed_at` | timestamptz | server timestamp of the `PUBLISHED → CLOSED` transition; NULL unless `status = 'closed'` |
+| `closed_by` | uuid | FK → `auth.users(id)`; the HR user who closed it; NULL unless `status = 'closed'` |
+
+Plus a `NOT VALID` check constraint (`job_vacancies_closed_audit`): a `closed`
+row must have both audit fields, a non-`closed` row must have neither. RLS is
+unchanged — closing is backend-only (service role); there is deliberately **no**
+authenticated/anon UPDATE policy, so a leaked browser key cannot change a
+vacancy's status.
+
+### API
+
+**`POST /api/vacancies/:id/close`** — HR only, **no request body**. The server
+controls `status` / `closed_at` / `closed_by`; anything in a body is ignored.
+
+| status | meaning |
+|---|---|
+| `200` | closed — data includes `status: "closed"`, `closed_at`, `closed_by`, and `public_url` (kept — the link stays resolvable) |
+| `401` | missing / invalid / expired token |
+| `403` | authenticated non-HR, **or** the vacancy belongs to another HR user |
+| `404` | `VACANCY_NOT_FOUND` |
+| `409` | `VACANCY_ALREADY_CLOSED` (re-close / idempotent double-click) or `VACANCY_NOT_PUBLISHED` (e.g. still a draft) |
+
+**`GET /api/public/vacancies/:token`** — **unauthenticated**. Now resolves both
+`published` and `closed` vacancies:
+
+| vacancy state | response |
+|---|---|
+| `published` | `200` with public-safe fields + `status: "published"` (the application form is shown) |
+| `closed` | `410 VACANCY_CLOSED` — `apply.html` shows a "Job vacancy closed / applications are no longer being accepted" notice |
+| `draft` / unknown token | plain `404` (nothing about a non-live vacancy leaks) |
+
+**`POST /api/public/vacancies/:token/applications`** — unchanged: only a
+`published` vacancy accepts a submission, so a closed vacancy rejects new
+applications server-side (`404`) even though its link still resolves.
+
+### Security & data integrity
+
+- Server-authorized end to end: `authenticateUser` + `requireHR`, then an
+  explicit "caller owns this vacancy" check (`created_by`). The HR identity and
+  the ownership are **never** taken from the request body / query.
+- The write is one conditional `UPDATE` guarded by `status = 'published'`, so it
+  is atomic and **idempotent**: a double-click / retried request updates zero
+  rows once the vacancy is closed instead of re-stamping the audit fields.
+- `PUBLISHED → CLOSED` is the only transition. `CLOSED → PUBLISHED` /
+  `CLOSED → DRAFT` are impossible (the status-machine rule in
+  `utils/vacancyClosure.js` and the conditional `UPDATE` both enforce it).
+- No cascade, no deletion: applications, CVs (private bucket), screening results
+  and selected candidates are untouched and remain visible to the owning HR user.
+- The `public_token` is kept, so `/apply.html#token=…` stays resolvable — it
+  just renders the closed state.
+
+### Frontend
+
+- `vacancy.html` / `vacancyPage.js` / `css/pages/vacancy.css` — the published
+  panel gains a **Close Vacancy** button (shown only when `status = 'published'`)
+  and an accessible confirmation dialog (reuses the shared `Modal`). After
+  closing, the switch is replaced by a **Closed** badge, a "Closed &lt;date&gt;"
+  note appears, the page heading updates, and the recruitment-data links
+  (applications / AI screening / candidates) stay available.
+- `apply.html` / `applyPage.js` — a new **"Job vacancy closed"** state, shown
+  when the public lookup returns `410`.
+- `vacancyService.close(id)` — wraps `POST /api/vacancies/:id/close`.
+
+### Tests
+
+`cd backend && npm test` also runs `vacancyClosure.test.js` — the
+`PUBLISHED → CLOSED` transition rule (allowed only from `published`; a draft is
+`VACANCY_NOT_PUBLISHED`, an already-closed vacancy is `VACANCY_ALREADY_CLOSED`,
+unknown statuses are never closable).
 
 ## Project structure
 
@@ -749,6 +925,8 @@ In the Supabase SQL editor, run the migrations in order:
 3. [`backend/sql/003_add_vacancy_publishing.sql`](backend/sql/003_add_vacancy_publishing.sql) — `public_token` + `published_at` (PB-02).
 4. [`backend/sql/004_create_applications.sql`](backend/sql/004_create_applications.sql) — `applications` table + private `candidate-cvs` storage bucket (PB-03).
 5. [`backend/sql/005_create_application_screenings.sql`](backend/sql/005_create_application_screenings.sql) — `application_screenings` table (PB-05 AI CV screening results), RLS with no policies.
+6. [`backend/sql/006_add_candidate_selection.sql`](backend/sql/006_add_candidate_selection.sql) — `selected_at` / `selected_by` audit columns on `applications` + supporting constraint/index (PB-07 candidate selection).
+7. [`backend/sql/007_add_vacancy_closing.sql`](backend/sql/007_add_vacancy_closing.sql) — `closed_at` / `closed_by` audit columns on `job_vacancies` + audit check constraint (PB-08 vacancy closing). `'closed'` was already an allowed `status` value since migration `002`.
 
 There is no self-service HR sign-up. To create your first HR user:
 
@@ -804,236 +982,27 @@ There is nothing machine-specific to change:
 - HR authorization is decided server-side by looking up `profiles.role`, not from anything the client sends.
 - `profiles` and `job_vacancies` have RLS enabled with per-owner policies; there is no anon policy on either.
 - `applications` has RLS enabled with **no** policies; CVs live in a **private** bucket. Applicant PII and CVs are backend-only.
-- The `DRAFT -> PUBLISHED` transition and the `public_token` are set only by the backend; a request body cannot influence them.
+- Candidate selection (PB-07) is an HR-only, owner-checked mutation: the acting HR user, the vacancy ownership and every application's vacancy are verified server-side, and the `submitted → selected` write is a single atomic, idempotent statement. AI screening results and CVs are never modified by it.
+- Vacancy closing (PB-08) is likewise HR-only and owner-checked: `PUBLISHED → CLOSED` is a single atomic, idempotent conditional `UPDATE`, the only allowed transition, and it never deletes or modifies applications, CVs, screening results or selected candidates. `closed_at` / `closed_by` are server-set.
+- The `DRAFT -> PUBLISHED` / `PUBLISHED -> CLOSED` transitions and the `public_token` are set only by the backend; a request body cannot influence them.
 - The public application link contains only the random token — no internal id, no HR identity.
 - Applicant submissions never touch Supabase directly; the browser only talks to the backend, which validates everything (including the CV bytes).
 - Backend error responses never include stack traces, SQL errors, or Supabase internals.
 - CORS reflects an origin only if it is explicitly configured or is a localhost / private-LAN address; public internet origins are rejected unless added to `CORS_ORIGINS`.
 
-## Remaining Sprint 1 work
+## Sprint 1 status
 
-Done: Step 0 (HR Login), PB-01 (Create Job Vacancy — draft), PB-02 (Publish
-Vacancy — public link generated), PB-03 (Applicant submits a CV application),
-PB-04 (HR reviews the application list + opens CVs), PB-05 (AI-assisted
-CV screening — score, recommendation, matched/missing skills, summary stored per
-application; advisory only), PB-06 (HR reviews the AI-filtered applicants —
-ranked AI Screening list + read-only Applicant Review with secure CV access).
+**Sprint 1 complete.** Step 0 (HR Login), PB-01 (Create Job Vacancy — draft),
+PB-02 (Publish Vacancy — public link generated), PB-03 (Applicant submits a CV
+application), PB-04 partial (HR reviews the application list + opens CVs), PB-05
+(AI-assisted CV screening — score, recommendation, matched/missing skills,
+summary stored per application; advisory only), PB-06 (HR reviews the
+AI-filtered applicants — ranked AI Screening list + read-only Applicant Review
+with secure CV access), PB-07 (HR selects candidates — explicit, confirmed
+`submitted → selected` transition), PB-08 (HR closes a job vacancy — one-way
+`PUBLISHED → CLOSED`; recruitment data preserved, new public applications
+blocked).
 
-Still to do, in rough order — each links to its build step in
-[`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md):
-
-- [ ] **PB-02/PB-03 update** (plan Steps 1.1 + 1.2) — public `GET /api/public/vacancies` list
-  endpoint + a public Applicant Portal listing page, so applicants discover
-  vacancies by browsing instead of only via a manually shared link (see
-  [Sprint 1 update](#sprint-1-update--public-applicant-portal)).
-- [ ] **PB-07** (plan Step 1.3) — HR selects candidates for interviews (new
-  application status transition; this is the bridge into Sprint 2).
-- [ ] **PB-08** (plan Step 1.4) — HR closes a job vacancy (`PUBLISHED ->
-  CLOSED`; removes it from the Applicant Portal).
-
-Application `status` stays `submitted` today — neither the AI screening
-pipeline nor PB-06 changes it, and no HR status transitions exist yet.
-
-## Sprint 2 — Interview, Hiring & Management (not started)
-
-Sprint 2 takes an HR-selected candidate (PB-07) through a configurable,
-per-vacancy interview process, schedules interviews against real employee
-availability, collects structured interviewer evaluations, and lets a Hiring
-Manager make the final call. **None of this is implemented yet** — no tables,
-no routes, no pages. This section is the full spec to build against, carried
-over from the updated product backlog.
-
-**To build it:** [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md) Phases 2–6 break
-this spec into 13 ordered steps (schema → API → UI per capability), each with a
-copy-paste prompt. Start with plan Step 2.1 (roles) and 2.2 (interview process
-schema) — everything else depends on those two.
-
-### How Sprint 1 hands off to Sprint 2
-
-```
-Applicant -> Application -> CV -> AI Screening -> HR Review -> Candidate Selected   (Sprint 1, PB-07)
-Candidate Selected -> Interview Process -> Interviews -> Interview Results
-   -> Hiring Manager -> Hire / Reject                                              (Sprint 2)
-```
-
-### PB-09 — HR selects the candidate's interview level
-
-After PB-07 selects a candidate, HR picks an interview level:
-**Internship/Entry, Junior, Mid-Level, or Senior**. The level drives which
-default interview stages load next (PB-10) — an internship candidate doesn't
-need the same process as a senior hire.
-
-### PB-10 — System displays default interview stages
-
-Given a vacancy + level, the system loads a default stage list. Defaults are
-**per vacancy**, not hard-coded per level — e.g. "Junior" for a Software
-Engineer role might default to `HR/Behavioural -> Technical -> Hiring
-Manager`, while "Junior" for an Accountant role might default to
-`HR/Behavioural -> Accounting Knowledge -> Hiring Manager`. Do not hard-code
-`Junior = Technical Interview` globally.
-
-### PB-11 — HR customizes the interview stages
-
-Defaults are a starting point, not a fixed process. HR can:
-
-- **Add** a stage (e.g. insert a System Design round)
-- **Remove** a stage
-- **Reorder** stages (move up / move down)
-
-`Default → HR customizes → Final interview process` per vacancy+candidate.
-
-### PB-12 — HR configures each interview stage
-
-For every stage, HR sets who's allowed to interview:
-
-- Department (e.g. IT)
-- Minimum seniority (e.g. Senior)
-- Number of interviewers required (usually 1; see the two-interviewer note
-  below)
-- Duration (e.g. 60 minutes)
-
-Example: *Technical Interview → IT dept, Senior+, 1 interviewer, 60 min* means
-"find an existing IT employee with Senior-level experience."
-
-**What is an interviewer?** Not a separate account/role — any existing
-employee. When HR assigns an employee to a stage, that employee *becomes* the
-interviewer for that one interview. No duplicate accounts, no new login.
-
-```
-EMPLOYEE -> assigned to an interview -> INTERVIEWER (for that interview only)
-```
-
-### PB-13 — Interviewer manages availability
-
-An employee (e.g. a Senior Software Engineer with existing dev work,
-meetings, etc.) logs into their **existing** account and opens an *Interview
-Availability Calendar* to add slots (date + start time + end time), and can
-hold multiple slots across multiple days. This is self-service so HR isn't
-manually chasing "are you free Wednesday?" over chat.
-
-### PB-14 — HR views interviewer availability
-
-When scheduling a stage, HR sees which employees matching that stage's
-requirements (PB-12) are available and when, via a scheduling calendar.
-**Important:** availability must be checked against *already-scheduled
-interviews too*, not just the raw slots the employee marked — otherwise two
-candidates could get double-booked into the same interviewer/hour. Booked
-time should show as unavailable even inside a marked-available window.
-
-### PB-15 — HR assigns an interviewer
-
-HR picks a suitable, available employee and assigns them to the
-candidate+stage. This creates the relationship
-`Interviewer -> assigned to -> Stage -> Candidate`.
-
-Some stages may need **two interviewers** (e.g. a System Design round with a
-Senior Engineer + a Technical Lead) — scheduling then needs a time where
-*both* are available (the overlap of their slots). This is a stretch goal:
-build the schema so it's supported, but shipping single-interviewer
-assignment first is acceptable if time is short.
-
-### PB-16 — HR schedules the interview
-
-Once candidate + stage + interviewer + date + time are all chosen, HR clicks
-**Schedule Interview**, which stores a scheduled `Interview` row (status
-`scheduled`).
-
-### PB-17 — System sends interview notifications
-
-On scheduling, both sides get notified:
-
-- **Candidate:** role, stage, date, time.
-- **Interviewer:** candidate name, stage, date, time.
-
-HR can also see the scheduled interview from their side.
-
-### PB-18 — Interviewer views assigned interviews
-
-The employee's existing dashboard gains an "Upcoming Interviews" panel
-(candidate, position, stage, date/time, a "View Interview" action). No new
-account needed — same login as PB-13.
-
-### PB-19 — Interviewer records interview ratings and feedback
-
-After conducting the interview, the interviewer submits a **structured**
-evaluation rather than a single good/bad flag — per-dimension ratings (e.g.
-Technical Knowledge, Problem Solving, Communication, Role Knowledge, each out
-of 5), an overall rating, and free-text comments. This is the interviewer's
-last responsibility in the flow; everything after this belongs to the Hiring
-Manager.
-
-### PB-20 — Hiring Manager reviews interview results and candidate progress
-
-The Hiring Manager's dashboard lists candidates currently in process per
-vacancy, with the AI score (PB-05) alongside every completed stage's rating
-(HR interview, Technical, System Design, etc.). Drilling into a candidate
-shows, per stage: interviewer, rating, comments, status.
-
-### PB-21 — Hiring Manager makes the final hiring decision
-
-A binary decision — **Hire** or **Reject** — sets `Candidate Status` to
-`HIRED` or `REJECTED`.
-
-### PB-22 — System sends the final decision to HR and the candidate
-
-- HR is told the outcome (hired/not selected) plainly.
-- The candidate gets a simple congratulations/thank-you message.
-- The candidate must **never** see internal data: other candidates' scores,
-  AI ranking, interviewer comments, or internal HR notes.
-
-### PB-23 — Management views recruitment dashboard and pipeline
-
-A funnel view of the whole process for a period, e.g.
-`Applications -> AI Screening -> HR Selected -> Interviews -> Final Review -> Hired/Rejected`,
-plus summary cards (Open Vacancies, Applications, Shortlisted, Interviews,
-Hired, Rejected).
-
-### PB-24 — Management generates recruitment reports
-
-A report (vacancies created, applications, AI-shortlisted, HR-selected,
-interviews completed, hired, rejected) for a given period. Export format
-(PDF/Excel/on-screen only) is left to the team's capacity — nothing here
-requires a specific format.
-
-### Database shape for Sprint 2
-
-These are the relationships to design around, not a final migration —
-finalize exact types/constraints when Sprint 2 work starts (following the
-`00N_description.sql` numbering already used in `backend/sql/`).
-
-| Table | Key columns | Purpose |
-|---|---|---|
-| `employees` | `employee_id`, `name`, `email`, `department`, `job_position`, `seniority_level` | The existing workforce; interviewers are employees, not a separate account type. Likely maps onto (or extends) the existing `profiles` table rather than being wholly new. |
-| `interview_stages` | `stage_id`, `stage_name`, `description` | Reusable stage catalogue (HR/Behavioural, Technical, System Design, …). |
-| `vacancy_interview_stages` | `id`, `vacancy_id`, `stage_id`, `stage_order` | The **per-vacancy, per-candidate** ordered stage list — what makes PB-10/11 possible without hard-coding stages per level. |
-| `interviewer_requirements` | `id`, `stage_id`, `department`, `minimum_seniority`, `required_number` | PB-12 — what kind of employee a stage needs; drives the PB-14 search. |
-| `interview_availability` | `availability_id`, `employee_id`, `date`, `start_time`, `end_time` | PB-13 — self-service slots; powers the PB-14 calendar. |
-| `interviews` | `interview_id`, `candidate_id`, `vacancy_id`, `stage_id`, `interviewer_id`, `date`, `start_time`, `end_time`, `status` | PB-15/16 — the scheduled event connecting candidate + vacancy + stage + interviewer + time. |
-| `interview_evaluations` | `evaluation_id`, `interview_id`, `interviewer_id`, `technical_rating`, `problem_solving_rating`, `communication_rating`, `overall_rating`, `comments` | PB-19 — the interviewer's structured result. |
-| `hiring_decisions` | `decision_id`, `candidate_id`, `hiring_manager_id`, `decision`, `decision_date` | PB-21 — the final Hire/Reject record. |
-
-### Full Sprint 2 pipeline
-
-```
-SELECT INTERVIEW LEVEL (PB-09)
-        |
-LOAD DEFAULT STAGES (PB-10)
-        |
-HR CUSTOMIZES STAGES (PB-11)
-        |
-CONFIGURE EACH STAGE / INTERVIEWER REQUIREMENTS (PB-12)
-        |
-FIND SUITABLE EMPLOYEES -> CHECK AVAILABILITY CALENDAR (PB-13/14)
-        |
-ASSIGN INTERVIEWER (PB-15)
-        |
-SCHEDULE INTERVIEW (PB-16)
-        |
-NOTIFICATION (PB-17) -> candidate + interviewer
-        |
-CONDUCT INTERVIEW -> RATING + COMMENTS -> SUBMIT EVALUATION (PB-18/19)
-        |
-========================================================
 HIRING MANAGER REVIEWS RESULTS + PIPELINE (PB-20)
         |
 FINAL HIRING DECISION: HIRE / REJECT (PB-21)
@@ -1057,5 +1026,10 @@ MANAGEMENT DASHBOARD: PIPELINE (PB-23) + REPORTS (PB-24)
   HR Selection → Interviews → Evaluations → Hiring Decisions into the
   recruitment dashboard, candidate pipeline, and recruitment reports
   (PB-23/24).
+The AI screening pipeline still never changes `applications.status`; the HR
+status transitions are PB-07's `submitted → selected` (applications) and PB-08's
+`published → closed` (vacancies).
+
+Next: **Sprint 2 — Configure Interview Stages.**
 
 

@@ -29,12 +29,23 @@ function splitList(value) {
     .filter(Boolean);
 }
 
+// Known deployed frontend origin(s). Kept here as a safe default so production
+// keeps working even if CORS_ORIGINS is not set in the host's environment.
+// Add custom domains / other sites via CORS_ORIGINS.
+const DEPLOYED_FRONTEND_ORIGINS = ['https://resilient-khapse-fd139a.netlify.app'];
+
 const configuredOrigins = new Set([
   APP_URL,
+  ...DEPLOYED_FRONTEND_ORIGINS,
   ...splitList(process.env.FRONTEND_URL),
   ...splitList(process.env.APP_URL),
   ...splitList(process.env.CORS_ORIGINS),
 ]);
+
+// Netlify preview / branch deploys for the site above, e.g.
+// https://deploy-preview-12--resilient-khapse-fd139a.netlify.app
+const NETLIFY_PREVIEW_RE =
+  /^https:\/\/[a-z0-9-]+--resilient-khapse-fd139a\.netlify\.app$/;
 
 const ALLOW_ANY = String(process.env.CORS_ALLOW_ANY).toLowerCase() === 'true';
 
@@ -58,6 +69,7 @@ function isAllowedOrigin(origin) {
 
   const normalized = origin.replace(/\/+$/, '');
   if (configuredOrigins.has(normalized)) return true;
+  if (NETLIFY_PREVIEW_RE.test(normalized)) return true;
   return LOCAL_ORIGIN_RE.test(normalized);
 }
 

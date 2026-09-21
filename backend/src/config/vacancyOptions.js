@@ -34,13 +34,17 @@ const EXPERIENCE_LEVELS = [
   '8+ Years',
 ];
 
-// PB-01 only ever creates DRAFT. PUBLISHED / CLOSED are listed for schema and
-// documentation purposes; their transitions belong to PB-02 and PB-08.
+// PB-01 only ever creates DRAFT. PB-02 owns DRAFT -> PUBLISHED, PB-08 owns
+// PUBLISHED -> CLOSED. There is no transition back out of CLOSED.
 const VACANCY_STATUS = Object.freeze({
   DRAFT: 'draft',
   PUBLISHED: 'published',
   CLOSED: 'closed',
 });
+
+// The only statuses a PB-08 "close vacancy" action may transition FROM. A draft
+// has nothing to close; a closed vacancy can never be re-opened.
+const VACANCY_CLOSABLE_FROM = Object.freeze(['published']);
 
 const LIMITS = Object.freeze({
   JOB_TITLE_MAX: 150,
@@ -57,5 +61,6 @@ module.exports = {
   EMPLOYMENT_TYPES,
   EXPERIENCE_LEVELS,
   VACANCY_STATUS,
+  VACANCY_CLOSABLE_FROM,
   LIMITS,
 };
