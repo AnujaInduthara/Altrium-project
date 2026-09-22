@@ -1,16 +1,21 @@
 const express = require('express');
-const { authenticateUser, requireHR } = require('../middleware/auth.middleware');
+const { authenticateUser, requireHR, requireRole } = require('../middleware/auth.middleware');
 const applicationController = require('../controllers/application.controller');
 const screeningController = require('../controllers/screening.controller');
 
-// HR-only: a verified Supabase session AND role = 'hr'. Per-application access
-// is further restricted to the HR user who owns the parent vacancy, inside the
-// controller.
+// Every route below requires a verified Supabase session. Most are HR-only
+// (role = 'hr'); per-application access is further restricted to the HR user
+// who owns the parent vacancy, inside the controller.
 const router = express.Router();
 
-router.use(authenticateUser, requireHR);
+router.use(authenticateUser);
 
-router.get('/:id/cv', applicationController.getApplicationCv);
+// PB-18: also reachable by an assigned, non-cancelled interviewer — narrowed
+// further inside the controller (HR-owns-vacancy OR assigned-interviewer).
+// Registered before the blanket requireHR below so it isn't HR-only.
+router.get('/:id/cv', requireRole('hr', 'employee', 'hiring_manager'), applicationController.getApplicationCv);
+
+router.use(requireHR);
 
 // PB-06 — the read-only applicant-review payload (applicant details + vacancy
 // summary + stored AI screening result), owner-checked.

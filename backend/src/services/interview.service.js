@@ -4,6 +4,7 @@ const availabilityService = require('./availability.service');
 const vacancyService = require('./vacancy.service');
 const notificationService = require('./notification.service');
 const { validateScheduleInput, fitsWithinAvailability } = require('../utils/interviewScheduling');
+const { toInterviewerView, filterByScope } = require('../utils/interviewerView');
 
 const INTERVIEW_FIELDS = [
   'id',
@@ -330,10 +331,132 @@ async function listForVacancy(vacancyId, authUserId) {
   return listInterviewsForVacancyIds([vacancyId], {});
 }
 
+// ---------------------------------------------------------------------------
+// PB-18 — the interviewer's own view of interviews they're assigned to.
+// Interviewers are ordinary employees on their existing account; access is
+// assignment-checked here, never role-checked beyond "authenticated employee"
+// (that part is the route's job). Not assigned -> 404, never 403. Neither
+// query joins application_screenings — an interviewer must never receive any
+// AI screening field, any other candidate, any other interviewer's
+// evaluation, or any HR note.
+// ---------------------------------------------------------------------------
+
+const INTERVIEWER_JOIN_SELECT = `
+  interviews!inner(
+    id,
+    status,
+    scheduled_date,
+    start_time,
+    end_time,
+    candidate_interview_stages(stage_name),
+    job_vacancies(job_title, department),
+    applications(full_name)
+  )
+`;
+
+// scope 'upcoming' | 'past' — see utils/interviewerView.js for the split.
+async function listForInterviewer({ profileId, scope }) {
+  const { data, error } = await supabaseAdmin
+    .from('interview_interviewers')
+    .select(INTERVIEWER_JOIN_SELECT)
+    .eq('profile_id', profileId)
+    .is('cancelled_at', null);
+
+  if (error) throw wrapDbError('Failed to list your interviews', error);
+
+  const views = (data || [])
+    .map((row) => row.interviews)
+    .filter(Boolean)
+    .map(toInterviewerView);
+
+  return filterByScope(views, scope, todayIsoUtc());
+}
+
+// Confirms a non-cancelled interview_interviewers row exists for
+// (interviewId, profileId); throws the typed not-found error otherwise
+// (never 403). This is THE assignment check for the interviewer's own view
+// (Step 4.1) — PB-19's evaluation.service.js reuses it as-is for its own
+// "not assigned -> 404" gate before applying its own, evaluation-specific
+// refusals (not started / cancelled / already submitted).
+async function assertAssignedInterviewer({ interviewId, profileId }) {
+  const { data: joinRow, error: joinError } = await supabaseAdmin
+    .from('interview_interviewers')
+    .select('id')
+    .eq('interview_id', interviewId)
+    .eq('profile_id', profileId)
+    .is('cancelled_at', null)
+    .maybeSingle();
+
+  if (joinError) {
+    if (joinError.code === '22P02') {
+      throw new InterviewError('INTERVIEW_NOT_FOUND', 404, 'This interview could not be found.');
+    }
+    throw wrapDbError('Failed to load this interview', joinError);
+  }
+  if (!joinRow) {
+    throw new InterviewError('INTERVIEW_NOT_FOUND', 404, 'This interview could not be found.');
+  }
+}
+
+// The same projection as listForInterviewer, plus what the interviewer needs
+// to prepare: the candidate's email/phone and the vacancy's job description
+// and requirements. Throws the typed not-found error (never 403) unless the
+// caller is an assigned, non-cancelled interviewer on this interview.
+async function getForInterviewer({ interviewId, profileId }) {
+  await assertAssignedInterviewer({ interviewId, profileId });
+
+  const { data: interview, error } = await supabaseAdmin
+    .from('interviews')
+    .select(
+      `id, application_id, status, scheduled_date, start_time, end_time,
+       candidate_interview_stages(stage_name),
+       job_vacancies(job_title, department, job_description, job_requirements),
+       applications(full_name, email, phone)`
+    )
+    .eq('id', interviewId)
+    .maybeSingle();
+
+  if (error) throw wrapDbError('Failed to load this interview', error);
+  if (!interview) {
+    throw new InterviewError('INTERVIEW_NOT_FOUND', 404, 'This interview could not be found.');
+  }
+
+  return {
+    ...toInterviewerView(interview),
+    // Not a screening/HR field — just the id the CV endpoint needs, and the
+    // interviewer's own assignment already grants them CV access to it.
+    application_id: interview.application_id,
+    candidate_email: interview.applications?.email ?? null,
+    candidate_phone: interview.applications?.phone ?? null,
+    job_description: interview.job_vacancies?.job_description ?? null,
+    job_requirements: interview.job_vacancies?.job_requirements ?? [],
+  };
+}
+
+// Used by application.controller.js's CV endpoint to extend HR's existing
+// signed-URL access to an assigned, non-cancelled interviewer of that
+// application. Fetches the caller's own (small) set of active assignments
+// rather than filtering server-side on a nested column, since the exact
+// PostgREST syntax for filtering an !inner-joined column varies by version.
+async function isAssignedInterviewer({ applicationId, profileId }) {
+  const { data, error } = await supabaseAdmin
+    .from('interview_interviewers')
+    .select('interviews!inner(application_id)')
+    .eq('profile_id', profileId)
+    .is('cancelled_at', null);
+
+  if (error) throw wrapDbError('Failed to check interviewer assignment', error);
+  return (data || []).some((row) => row.interviews?.application_id === applicationId);
+}
+
 module.exports = {
   schedule,
   cancel,
   listUpcomingForHr,
   listForVacancy,
+  listForInterviewer,
+  getForInterviewer,
+  isAssignedInterviewer,
+  assertAssignedInterviewer,
   InterviewError,
 };

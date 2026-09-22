@@ -18,6 +18,13 @@ export const NAV_ITEMS = [
   { id: 'reports', label: 'Reports', href: 'reports.html', icon: 'chart', roles: ['hr'] },
   { id: 'settings', label: 'Settings', href: 'settings.html', icon: 'settings', roles: ['hr'] },
   {
+    id: 'my-interviews',
+    label: 'My Interviews',
+    href: 'employee-dashboard.html',
+    icon: 'calendar',
+    roles: ['employee'],
+  },
+  {
     id: 'my-availability',
     label: 'My Availability',
     href: 'my-availability.html',

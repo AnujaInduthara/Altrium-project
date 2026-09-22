@@ -51,4 +51,47 @@ export const InterviewService = {
     });
     return toResult(response);
   },
+
+  // PB-18 — the caller's own assigned interviews. scope: 'upcoming' | 'past'.
+  async listMine({ scope = 'upcoming' } = {}) {
+    const response = await fetch(`${apiBase}/interviews/mine?scope=${encodeURIComponent(scope)}`, {
+      headers: await authHeaders(),
+    });
+    return toResult(response);
+  },
+
+  // PB-18 — one assigned interview's detail (schedule, candidate, vacancy
+  // summary). 404 if the caller isn't an assigned interviewer on it.
+  async getOne(interviewId) {
+    const response = await fetch(`${apiBase}/interviews/${encodeURIComponent(interviewId)}`, {
+      headers: await authHeaders(),
+    });
+    return toResult(response);
+  },
+
+  // PB-19 — the caller's own evaluation for this interview, or null if they
+  // haven't submitted yet.
+  async getEvaluation(interviewId) {
+    const response = await fetch(`${apiBase}/interviews/${encodeURIComponent(interviewId)}/evaluation`, {
+      headers: await authHeaders(),
+    });
+    return toResult(response);
+  },
+
+  // PB-19 — submit the caller's structured evaluation. overall_rating is
+  // always computed server-side; never sent here.
+  async submitEvaluation(interviewId, { technical_rating, problem_solving_rating, communication_rating, role_knowledge_rating, comments }) {
+    const response = await fetch(`${apiBase}/interviews/${encodeURIComponent(interviewId)}/evaluation`, {
+      method: 'POST',
+      headers: await authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        technical_rating,
+        problem_solving_rating,
+        communication_rating,
+        role_knowledge_rating,
+        comments,
+      }),
+    });
+    return toResult(response);
+  },
 };

@@ -42,4 +42,32 @@ async function cancelInterview(req, res) {
   }
 }
 
-module.exports = { listInterviews, cancelInterview };
+// GET /api/interviews/mine?scope=upcoming|past — PB-18. Any authenticated
+// employee/hr/hiring_manager; only interviews the caller is assigned to.
+async function listMyInterviews(req, res) {
+  try {
+    const scope = req.query.scope === 'past' ? 'past' : 'upcoming';
+    const interviews = await interviewService.listForInterviewer({
+      profileId: req.profile.id,
+      scope,
+    });
+    return successResponse(res, { interviews });
+  } catch (err) {
+    return handleError(res, err, 'listMyInterviews');
+  }
+}
+
+// GET /api/interviews/:id — PB-18. Assignment-checked; not assigned -> 404.
+async function getMyInterview(req, res) {
+  try {
+    const interview = await interviewService.getForInterviewer({
+      interviewId: req.params.id,
+      profileId: req.profile.id,
+    });
+    return successResponse(res, interview);
+  } catch (err) {
+    return handleError(res, err, 'getMyInterview');
+  }
+}
+
+module.exports = { listInterviews, cancelInterview, listMyInterviews, getMyInterview };

@@ -17,6 +17,11 @@
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.dashboard-interviews #dashboard-interviews-list {
+  margin-top: var(--space-2);
 }
 
 @keyframes page-fade {

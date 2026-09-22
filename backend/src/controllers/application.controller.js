@@ -1,6 +1,7 @@
 const { successResponse, errorResponse } = require('../utils/response');
 const vacancyService = require('../services/vacancy.service');
 const applicationService = require('../services/application.service');
+const interviewService = require('../services/interview.service');
 const screeningService = require('../services/screening/screeningService');
 const { toScreeningView } = require('./screening.controller');
 const { normalizeApplicationIds } = require('../utils/candidateSelection');
@@ -53,10 +54,23 @@ async function listVacancyApplications(req, res) {
   }
 }
 
-// GET /api/applications/:id/cv — HR only. Returns a short-lived signed URL for
-// the applicant's CV, but only to the HR user who owns the vacancy. An
-// application owned by someone else is reported as "not found" so nothing about
-// its existence leaks.
+// HR owns the vacancy behind this application, OR (PB-18) the caller is an
+// assigned, non-cancelled interviewer somewhere in this application's
+// interview process. Either grants CV access; neither means "not found".
+async function canAccessApplicationCv(application, authUserId, profileId) {
+  try {
+    const vacancy = await vacancyService.getVacancyForUser(application.vacancy_id, authUserId);
+    if (vacancy) return true;
+  } catch (err) {
+    if (!(err && err.isVacancyError && err.code === 'FORBIDDEN')) throw err;
+  }
+  return interviewService.isAssignedInterviewer({ applicationId: application.id, profileId });
+}
+
+// GET /api/applications/:id/cv — HR (owner-checked) or an assigned
+// interviewer (PB-18). Returns a short-lived signed URL for the applicant's
+// CV. An application the caller has no access to is reported as "not found"
+// so nothing about its existence leaks.
 async function getApplicationCv(req, res) {
   try {
     const application = await applicationService.getApplicationById(req.params.id);
@@ -64,16 +78,8 @@ async function getApplicationCv(req, res) {
       return errorResponse(res, 404, 'APPLICATION_NOT_FOUND', 'This application could not be found.');
     }
 
-    let vacancy;
-    try {
-      vacancy = await vacancyService.getVacancyForUser(application.vacancy_id, req.user.id);
-    } catch (err) {
-      if (err && err.isVacancyError && err.code === 'FORBIDDEN') {
-        return errorResponse(res, 404, 'APPLICATION_NOT_FOUND', 'This application could not be found.');
-      }
-      throw err;
-    }
-    if (!vacancy) {
+    const authorized = await canAccessApplicationCv(application, req.user.id, req.profile.id);
+    if (!authorized) {
       return errorResponse(res, 404, 'APPLICATION_NOT_FOUND', 'This application could not be found.');
     }
 

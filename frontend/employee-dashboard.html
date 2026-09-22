@@ -15,7 +15,7 @@
 <body>
   <!-- The app shell (header + sidebar) is injected around this container by
        js/components/AppShell.js. Only page-specific content lives here. -->
-  <div id="app" data-active-nav="">
+  <div id="app" data-active-nav="my-interviews">
     <section class="page" id="dashboard-content" hidden>
       <header class="page-header">
         <h1 class="page-header__title">Welcome</h1>
@@ -33,6 +33,21 @@
         </div>
         <a class="button button--primary" href="my-availability.html">Go to My Availability</a>
       </div>
+
+      <section class="card dashboard-interviews" id="dashboard-interviews-card">
+        <div class="card__header">
+          <h2 class="card__title">Upcoming Interviews</h2>
+          <p class="card__subtitle">Interviews you're assigned to conduct.</p>
+        </div>
+
+        <p class="status-message" id="dashboard-interviews-loading" role="status">Loading interviews…</p>
+
+        <p class="text-muted text-sm" id="dashboard-interviews-empty" hidden>
+          You have no upcoming interviews.
+        </p>
+
+        <ul class="interview-group__list" id="dashboard-interviews-list" hidden></ul>
+      </section>
     </section>
   </div>
 
