@@ -1,8 +1,16 @@
 # Altrium — Development Plan (remaining features)
 
-A step-by-step build order for everything that is **not yet implemented**: the
-Sprint 1 remainder (Applicant Portal, PB-07, PB-08) and all of Sprint 2
-(PB-09 → PB-24), finishing with a hardening pass.
+> **Status: all phases below are built and merged** (see the ✅ Done tags on
+> each Phase/Step heading and [Appendix C](#appendix-c--final-acceptance-checklist)'s
+> checklist). This file is kept as the historical build order and the record
+> of what was deliberately deferred — see
+> [Appendix D](#appendix-d--deferred). [`README.md`](README.md) is the
+> current source of truth for how the system actually works.
+
+A step-by-step build order for everything that was **not yet implemented** at
+the time this plan was written: the Sprint 1 remainder (Applicant Portal,
+PB-07, PB-08) and all of Sprint 2 (PB-09 → PB-24), finishing with a hardening
+pass.
 
 Every step is sized to be **one branch → one PR**, and every step ends with a
 **copy-paste prompt** you can hand to Claude Code (Sonnet, high thinking mode).
@@ -46,9 +54,10 @@ projections), not boilerplate.
 
 ---
 
-## 2. Where the project stands today
+## 2. Where the project stood at the start of this plan
 
-Verified against the code, not assumed:
+Verified against the code at the time, not assumed. This table is a
+historical snapshot — see [README.md](README.md) for current state.
 
 | Area | State |
 |---|---|
@@ -62,6 +71,12 @@ Verified against the code, not assumed:
 | Sidebar | [`navigation.js`](frontend/js/config/navigation.js) already links `interviews.html`, `candidates.html`, `reports.html`, `settings.html` — **all four are dead links today.** This plan fills three of them; Settings stays out of scope. |
 | Migrations | `001` … `005` applied. **Next number is `006`.** |
 | Tests | `node --test` over `backend/test/*.test.js`. Pure unit tests, no network, no DB. |
+
+**Where it stands now**: all 28 steps below are built (migrations `006`–`015`
+applied, `requireRole` replaced the hardcoded `requireHR` check, Settings
+stayed out of scope as planned). See [README.md](README.md) for the current
+architecture, API surface and database schema, and
+[Appendix D](#appendix-d--deferred) for what was deliberately left out.
 
 ---
 
@@ -196,9 +211,9 @@ and schema review early so they aren't idle.
 
 ---
 
-# PHASE 1 — Finish Sprint 1
+# PHASE 1 — Finish Sprint 1 — ✅ Done
 
-## Step 1.1 — Public vacancy listing API `[PB-02 update]`
+## Step 1.1 — Public vacancy listing API `[PB-02 update]` — ✅ Done
 
 **Goal.** Let anyone (no auth) fetch the list of currently published vacancies,
 so the Applicant Portal has something to render. This is the backend half of
@@ -299,7 +314,7 @@ DONE WHEN
 
 ---
 
-## Step 1.2 — Applicant Portal page `[PB-02 / PB-03 update]`
+## Step 1.2 — Applicant Portal page `[PB-02 / PB-03 update]` — ✅ Done
 
 **Goal.** The public entry point. An applicant lands on the portal, browses
 open roles, opens one, and applies — no account, no link from HR.
@@ -389,7 +404,7 @@ DONE WHEN
 
 ---
 
-## Step 1.3 — PB-07: HR selects candidates for interviews
+## Step 1.3 — PB-07: HR selects candidates for interviews — ✅ Done
 
 **Goal.** The bridge from Sprint 1 to Sprint 2. HR moves a reviewed applicant
 to `shortlisted` / `selected` / `rejected`, with an audit trail. The AI never
@@ -515,7 +530,7 @@ DONE WHEN
 
 ---
 
-## Step 1.4 — PB-08: HR closes a job vacancy
+## Step 1.4 — PB-08: HR closes a job vacancy — ✅ Done
 
 **Goal.** A `PUBLISHED → CLOSED` transition that stops new applications and
 removes the role from the portal, while HR keeps full visibility.
@@ -589,13 +604,13 @@ DONE WHEN
 
 ---
 
-# PHASE 2 — Sprint 2 foundations
+# PHASE 2 — Sprint 2 foundations — ✅ Done
 
 Phases 3–6 all depend on two things that don't exist yet: **people who aren't
 HR** (employees, hiring managers) and **a per-candidate interview process**.
 Build these two first, carefully — everything else sits on top.
 
-## Step 2.1 — Roles and the employee directory
+## Step 2.1 — Roles and the employee directory — ✅ Done
 
 **Goal.** Turn `profiles` into a real employee directory with roles,
 department, job position and seniority, and generalise the authorization
@@ -730,7 +745,7 @@ DONE WHEN
 
 ---
 
-## Step 2.2 — Interview process schema `[PB-09 … PB-12 data model]`
+## Step 2.2 — Interview process schema `[PB-09 … PB-12 data model]` — ✅ Done
 
 **Goal.** The tables that make "different vacancies → different interview
 stages" possible without hard-coding, plus the per-candidate copy HR actually
@@ -870,7 +885,7 @@ DONE WHEN
 
 ---
 
-## Step 2.3 — Interview process API `[PB-09, PB-10, PB-11, PB-12]`
+## Step 2.3 — Interview process API `[PB-09, PB-10, PB-11, PB-12]` — ✅ Done
 
 **Goal.** Create a candidate's interview process from defaults, then let HR
 add, remove, reorder and configure stages.
@@ -985,7 +1000,7 @@ DONE WHEN
 
 ---
 
-## Step 2.4 — Interview process UI `[PB-09 … PB-12 frontend]`
+## Step 2.4 — Interview process UI `[PB-09 … PB-12 frontend]` — ✅ Done
 
 **Goal.** The HR screen where a selected candidate gets a level, sees the
 proposed stages, edits them, and configures who may interview each stage.
@@ -1069,7 +1084,7 @@ DONE WHEN
 
 ---
 
-# PHASE 3 — Availability and scheduling
+# PHASE 3 — Availability and scheduling — ✅ Done
 
 The heart of Sprint 2, and the part most likely to be built wrong. Two rules
 drive every step here:
@@ -1079,7 +1094,7 @@ drive every step here:
 2. **The database, not the application, is the final guard against double
    booking.** Two HR users scheduling at the same instant must not both win.
 
-## Step 3.1 — PB-13: interviewer manages availability
+## Step 3.1 — PB-13: interviewer manages availability — ✅ Done
 
 **Goal.** Any employee opens their own calendar and publishes when they can
 interview, without messaging HR.
@@ -1219,7 +1234,7 @@ DONE WHEN
 
 ---
 
-## Step 3.2 — PB-14: HR views matching interviewers and their real free time
+## Step 3.2 — PB-14: HR views matching interviewers and their real free time — ✅ Done
 
 **Goal.** For one configured stage, show which employees qualify and exactly
 when they are genuinely free — availability minus interviews already booked.
@@ -1329,7 +1344,7 @@ DONE WHEN
 
 ---
 
-## Step 3.3 — PB-15 / PB-16: assign interviewers and schedule the interview
+## Step 3.3 — PB-15 / PB-16: assign interviewers and schedule the interview — ✅ Done
 
 **Goal.** Turn a chosen employee + time into a booked interview, with the
 database itself preventing double booking.
@@ -1481,7 +1496,7 @@ DONE WHEN
 
 ---
 
-## Step 3.4 — PB-17: interview notifications
+## Step 3.4 — PB-17: interview notifications — ✅ Done
 
 **Goal.** Tell the candidate and the interviewer that an interview exists,
 without leaking anything internal.
@@ -1596,12 +1611,12 @@ DONE WHEN
 
 ---
 
-# PHASE 4 — The interviewer experience
+# PHASE 4 — The interviewer experience — ✅ Done
 
 Two steps, both on the employee's existing account. **No new account type** —
 this is the single most important idea in the brief.
 
-## Step 4.1 — PB-18: interviewer views assigned interviews
+## Step 4.1 — PB-18: interviewer views assigned interviews — ✅ Done
 
 **Goal.** An employee signs in and sees the interviews they must conduct, with
 enough context to prepare — and nothing more.
@@ -1714,7 +1729,7 @@ DONE WHEN
 
 ---
 
-## Step 4.2 — PB-19: interviewer records ratings and feedback
+## Step 4.2 — PB-19: interviewer records ratings and feedback — ✅ Done
 
 **Goal.** Structured evaluation instead of a good/bad flag, computed and stored
 so the Hiring Manager can compare candidates fairly.
@@ -1827,9 +1842,9 @@ DONE WHEN
 
 ---
 
-# PHASE 5 — Hiring Manager
+# PHASE 5 — Hiring Manager — ✅ Done
 
-## Step 5.1 — PB-20: Hiring Manager reviews results and candidate progress
+## Step 5.1 — PB-20: Hiring Manager reviews results and candidate progress — ✅ Done
 
 **Goal.** One screen where a Hiring Manager compares candidates across the AI
 score and every completed interview stage, then drills into the detail.
@@ -1937,7 +1952,7 @@ DONE WHEN
 
 ---
 
-## Step 5.2 — PB-21: final hiring decision
+## Step 5.2 — PB-21: final hiring decision — ✅ Done
 
 **Goal.** Record Hire or Reject, once, with an audit trail, and move the
 application to its terminal status.
@@ -2045,7 +2060,7 @@ DONE WHEN
 
 ---
 
-## Step 5.3 — PB-22: send the final decision to HR and the candidate
+## Step 5.3 — PB-22: send the final decision to HR and the candidate — ✅ Done
 
 **Goal.** Notify both sides — and make the candidate-facing message provably
 free of internal information.
@@ -2121,9 +2136,9 @@ DONE WHEN
 
 ---
 
-# PHASE 6 — Management dashboard and reporting
+# PHASE 6 — Management dashboard and reporting — ✅ Done
 
-## Step 6.1 — PB-23: recruitment dashboard and candidate pipeline
+## Step 6.1 — PB-23: recruitment dashboard and candidate pipeline — ✅ Done
 
 **Goal.** The funnel — how many people are at each stage of recruitment — plus
 summary cards, for management.
@@ -2229,7 +2244,7 @@ DONE WHEN
 
 ---
 
-## Step 6.2 — PB-24: recruitment reports and export
+## Step 6.2 — PB-24: recruitment reports and export — ✅ Done
 
 **Goal.** A period report management can take away — on screen and as a
 download.
@@ -2322,9 +2337,9 @@ DONE WHEN
 
 ---
 
-# PHASE 7 — Hardening and release
+# PHASE 7 — Hardening and release — ✅ Done
 
-## Step 7.1 — Seed and demo data
+## Step 7.1 — Seed and demo data — ✅ Done
 
 **Goal.** One script that fills an empty database with a realistic end-to-end
 scenario, so every later step (and your demo) has something to show.
@@ -2407,7 +2422,7 @@ DONE WHEN
 
 ---
 
-## Step 7.2 — Security and RLS audit
+## Step 7.2 — Security and RLS audit — ✅ Done
 
 **Goal.** Verify, file by file, that the guarantees claimed in the README are
 actually true after twelve new steps of code.
@@ -2476,7 +2491,7 @@ DONE WHEN
 
 ---
 
-## Step 7.3 — End-to-end verification and documentation
+## Step 7.3 — End-to-end verification and documentation — ✅ Done
 
 **Goal.** Prove the whole pipeline works in one sitting, and leave the docs
 true.
@@ -2542,6 +2557,10 @@ DONE WHEN
 
 Apply in order in the Supabase SQL editor. Never edit an applied file.
 
+> As actually applied — numbers below differ from what each step's own prompt
+> originally suggested, because earlier/parallel steps claimed those numbers
+> first. Each file has a comment noting its renumbering where relevant.
+
 | # | File | Step | Adds |
 |---|---|---|---|
 | 001 | `001_create_profiles.sql` | done | `profiles` |
@@ -2549,17 +2568,18 @@ Apply in order in the Supabase SQL editor. Never edit an applied file.
 | 003 | `003_add_vacancy_publishing.sql` | done | `public_token`, `published_at` |
 | 004 | `004_create_applications.sql` | done | `applications` + `candidate-cvs` bucket |
 | 005 | `005_create_application_screenings.sql` | done | `application_screenings` |
-| 006 | `006_add_application_status_audit.sql` | 1.3 | status audit columns |
-| 007 | `007_extend_profiles_employees.sql` | 2.1 | employee fields + role check |
-| 008 | `008_create_interview_process.sql` | 2.2 | stage catalogue, defaults, per-candidate process + stages |
-| 009 | `009_create_interview_availability.sql` | 3.1 | availability + no-overlap exclusion constraint |
-| 010 | `010_create_interviews.sql` | 3.3 | interviews + interviewers join + double-booking constraint |
-| 011 | `011_create_notifications.sql` | 3.4 | notifications |
-| 012 | `012_create_interview_evaluations.sql` | 4.2 | evaluations |
-| 013 | `013_create_hiring_decisions.sql` | 5.2 | decisions **+ alters the applications status check to allow `hired`** |
+| 006 | `006_add_candidate_selection.sql` | 1.3 | `selected_at`/`selected_by` audit columns |
+| 007 | `007_add_vacancy_closing.sql` | 1.4 | `closed_at`/`closed_by` audit columns |
+| 008 | `008_add_application_status_audit.sql` | 1.3 | `status_updated_at`/`status_updated_by`/`hr_note` |
+| 009 | `009_extend_profiles_employees.sql` | 2.1 | employee fields + role check |
+| 010 | `010_create_interview_process.sql` | 2.2 | stage catalogue, defaults, per-candidate process + stages |
+| 011 | `011_create_interview_availability.sql` | 3.1 | availability + no-overlap exclusion constraint |
+| 012 | `012_create_interviews.sql` | 3.3 | interviews + interviewers join + double-booking constraint |
+| 013 | `013_create_notifications.sql` | 3.4 | notifications |
+| 014 | `014_create_interview_evaluations.sql` | 4.2 | evaluations |
+| 015 | `015_create_hiring_decisions.sql` | 5.2 | decisions **+ alters the applications status check to allow `hired`**, loosens migration 006's selection-audit constraint |
 
-**Steps with no migration:** 1.1, 1.2, 1.4 (`closed` already allowed), 2.3,
-2.4, 3.2, 4.1, 5.1, 5.3, 6.1, 6.2, 7.x.
+**Steps with no migration:** 1.1, 1.2, 2.3, 2.4, 3.2, 4.1, 5.1, 5.3, 6.1, 6.2, 7.x.
 
 ---
 
@@ -2599,31 +2619,63 @@ Apply in order in the Supabase SQL editor. Never edit an applied file.
 # Appendix C — Final acceptance checklist
 
 Sprint 1
-- [ ] Published vacancies are discoverable on a public Applicant Portal — no manual link sharing (1.1, 1.2)
-- [ ] HR can select, shortlist and reject candidates with an audit trail (1.3)
-- [ ] HR can close a vacancy and it leaves the portal (1.4)
+- [x] Published vacancies are discoverable on a public Applicant Portal — no manual link sharing (1.1, 1.2)
+- [x] HR can select, shortlist and reject candidates with an audit trail (1.3)
+- [x] HR can close a vacancy and it leaves the portal (1.4)
 
 Sprint 2
-- [ ] Employees, hiring managers and management have roles and directory data (2.1)
-- [ ] Interview stage defaults exist per vacancy + level, with a global fallback (2.2)
-- [ ] HR picks a level and gets default stages (PB-09, PB-10) (2.3, 2.4)
-- [ ] HR can add, remove, reorder and configure stages (PB-11, PB-12) (2.3, 2.4)
-- [ ] Employees publish their own availability (PB-13) (3.1)
-- [ ] HR sees qualified interviewers and their genuinely free time (PB-14) (3.2)
-- [ ] HR assigns an interviewer and schedules, with double booking impossible (PB-15, PB-16) (3.3)
-- [ ] Candidate and interviewer are notified (PB-17) (3.4)
-- [ ] Interviewers see their assigned interviews on their existing account (PB-18) (4.1)
-- [ ] Interviewers submit structured ratings and comments (PB-19) (4.2)
-- [ ] The Hiring Manager reviews AI score plus every interview result (PB-20) (5.1)
-- [ ] The Hiring Manager records a final Hire/Reject (PB-21) (5.2)
-- [ ] HR and the candidate are notified, with nothing internal leaked (PB-22) (5.3)
-- [ ] Management sees the pipeline dashboard (PB-23) (6.1)
-- [ ] Management generates and exports recruitment reports (PB-24) (6.2)
+- [x] Employees, hiring managers and management have roles and directory data (2.1)
+- [x] Interview stage defaults exist per vacancy + level, with a global fallback (2.2)
+- [x] HR picks a level and gets default stages (PB-09, PB-10) (2.3, 2.4)
+- [x] HR can add, remove, reorder and configure stages (PB-11, PB-12) (2.3, 2.4)
+- [x] Employees publish their own availability (PB-13) (3.1)
+- [x] HR sees qualified interviewers and their genuinely free time (PB-14) (3.2)
+- [x] HR assigns an interviewer and schedules, with double booking impossible (PB-15, PB-16) (3.3)
+- [x] Candidate and interviewer are notified (PB-17) (3.4)
+- [x] Interviewers see their assigned interviews on their existing account (PB-18) (4.1)
+- [x] Interviewers submit structured ratings and comments (PB-19) (4.2)
+- [x] The Hiring Manager reviews AI score plus every interview result (PB-20) (5.1)
+- [x] The Hiring Manager records a final Hire/Reject (PB-21) (5.2)
+- [x] HR and the candidate are notified, with nothing internal leaked (PB-22) (5.3)
+- [x] Management sees the pipeline dashboard (PB-23) (6.1)
+- [x] Management generates and exports recruitment reports (PB-24) (6.2)
 
 Quality gates
-- [ ] `cd backend && npm test` passes
-- [ ] Security audit complete, HIGH/MEDIUM findings closed (7.2)
-- [ ] Seed script produces a demo-ready database (7.1)
-- [ ] End-to-end script in README.md verified on a fresh database (7.3)
-- [ ] Every page works at 360px with no horizontal scroll
-- [ ] README.md, frontend/README.md and this plan match the code (7.3)
+- [x] `cd backend && npm test` passes
+- [x] Security audit complete, HIGH/MEDIUM findings closed (7.2)
+- [x] Seed script produces a demo-ready database (7.1)
+- [x] End-to-end script in README.md verified on a fresh database (7.3)
+- [ ] Every page works at 360px with no horizontal scroll — not re-verified in this pass; no responsive-layout changes were made since Phase 6, but this specific check was not re-run
+- [x] README.md, frontend/README.md and this plan match the code (7.3)
+
+---
+
+# Appendix D — Deferred
+
+Scoped out or knowingly shipped narrower than the plan originally described.
+Each line is what's missing and what it would take.
+
+- **Real email/SMS delivery.** `notification.service.js` writes every
+  notification to the `notifications` table (in-app only); `notification.transport.js`
+  is a documented seam with no provider wired up. To add it: implement that
+  transport against a provider (e.g. Resend, SendGrid, Twilio), call it from
+  `dispatchInBackground`, and treat delivery failures as best-effort (never
+  block the underlying action on send failure).
+- **Multi-interviewer scheduling.** The schema (`interview_interviewers` is a
+  join table) supports more than one interviewer per interview stage, but
+  scheduling only ever assigns exactly one. To add it: allow `POST
+  .../schedule` to accept multiple interviewer ids, extend the availability
+  conflict check to validate each one, and decide how a stage's single
+  evaluation becomes multiple (one evaluation per interviewer, or a combined
+  one).
+- **PDF/Excel report export.** Only CSV export was built (PB-24). To add a PDF
+  or Excel export: reuse `buildRecruitmentReport`'s existing `{totals,
+  by_vacancy}` shape and format it with a library (e.g. `exceljs` for
+  `.xlsx`, or a headless-render approach for PDF) behind a new `format=xlsx`
+  branch in `reporting.controller.js`, next to the existing `format=csv`
+  branch.
+- **Settings page.** `navigation.js` has always linked `settings.html`; it was
+  explicitly out of scope for both sprints and still has no page behind it.
+- **Responsive check at 360px.** Not re-verified as part of this pass (see
+  the unchecked item above) — needs a manual click-through of every page at
+  360px width before this can be ticked.
