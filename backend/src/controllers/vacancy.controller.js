@@ -2,6 +2,7 @@ const { successResponse, errorResponse } = require('../utils/response');
 const { validateVacancyInput } = require('../utils/vacancyValidation');
 const { buildPublicApplyUrl } = require('../config/app');
 const vacancyService = require('../services/vacancy.service');
+const { toVacancyErrorResponse } = require('../utils/vacancyOwnershipError');
 
 // Adds the derived public application URL (null until the vacancy is published)
 // so the frontend never has to know how the link is built. `baseUrl` is the
@@ -16,11 +17,13 @@ function withPublicUrl(vacancy, baseUrl) {
   };
 }
 
-// Translates a typed VacancyError straight to a response; anything else is an
-// unexpected failure and becomes a generic 500 (details logged, never sent).
+// Translates a typed VacancyError to a response (FORBIDDEN becomes 404 — see
+// toVacancyErrorResponse); anything else is an unexpected failure and
+// becomes a generic 500 (details logged, never sent).
 function handleError(res, err, label) {
   if (err && err.isVacancyError) {
-    return errorResponse(res, err.status, err.code, err.message);
+    const { status, code, message } = toVacancyErrorResponse(err);
+    return errorResponse(res, status, code, message);
   }
   console.error(`${label} failed:`, err.message);
   return errorResponse(res, 500, 'INTERNAL_ERROR', 'Something went wrong. Please try again.');

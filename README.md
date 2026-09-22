@@ -837,16 +837,39 @@ There is nothing machine-specific to change:
 
 ## Security notes
 
-- `SUPABASE_SERVICE_ROLE_KEY` is read only in `backend/src/config/supabase.js` and never sent to the browser.
+Audited end-to-end in Step 7.2 of `DEVELOPMENT_PLAN.md` against every route,
+every table and every response projection added through Phase 6; two
+ownership-leak findings from that audit are fixed and covered by
+`backend/test/vacancyOwnershipError.test.js`.
+
+**Secrets and auth**
+- `SUPABASE_SERVICE_ROLE_KEY` is read only in `backend/src/config/supabase.js` and never sent to the browser; `frontend/js/config.js` holds only the anon key, which is designed to be public (access is enforced by the backend + RLS, not by keeping it secret).
 - Passwords are handled entirely by Supabase Auth; nothing here stores or hashes passwords.
-- HR authorization is decided server-side by looking up `profiles.role`, not from anything the client sends.
-- `profiles` and `job_vacancies` have RLS enabled with per-owner policies; there is no anon policy on either.
-- `applications` has RLS enabled with **no** policies; CVs live in a **private** bucket. Applicant PII and CVs are backend-only.
+- Every role (`hr`, `employee`, `hiring_manager`, `management`) is decided server-side by looking up `profiles.role` (`auth.middleware.js`'s `requireRole`), never from anything the client sends. An "interviewer" is not a separate role — any active `employee`/`hr`/`hiring_manager` profile that meets a stage's requirements can be assigned one.
+
+**Authorization pattern**
+- Every non-public route is `authenticateUser` → `requireRole(...)` → an explicit ownership or assignment check inside the service (vacancy ownership via `created_by`, interview-assignment via `interview_interviewers`, pipeline membership via `candidate_interview_processes`). Reading or acting on someone else's record returns **404, not 403** — a 403 there would itself confirm the record exists. `backend/src/utils/vacancyOwnershipError.js` centralises this translation for every caller of `vacancyService.getVacancyForUser`/`publishVacancy`/`closeVacancy`.
+- Role separation is enforced per route, not just per resource: `hiring_manager`/`management` can read the hiring pipeline but HR cannot (`hiring.routes.js`), and only `hiring_manager` (never `management`) can record a hire/reject decision (`hiring.routes.js`'s stricter `requireRole` on the decision route).
+
+**Database**
+- Every table has RLS **enabled**. `profiles` and `job_vacancies` have narrow per-owner `select`/`insert` policies (self-read, own-vacancy-only); every other table (`applications`, `application_screenings`, `notifications`, `interview_availability`, `interviews`, `interview_interviewers`, `interview_evaluations`, `hiring_decisions`, the interview-process tables, …) has RLS enabled with **no** policies at all — access is backend-only via the service-role key. A leaked anon/authenticated key can read or write none of them.
+- CVs live in a **private** storage bucket behind short-lived (120s) signed URLs, minted only after an ownership or assignment check; `cv_path` itself is never returned in any API response.
+
+**Candidate privacy boundary**
+- A candidate never has an authenticated session — every candidate-facing surface is either the public, rate-limited `/api/public/*` routes or a notification. Both are deliberate, explicit-allow-list projections, never a copy of an internal row with fields deleted: the public vacancy listing/detail exposes only job-posting fields plus the vacancy's own `public_token` (no internal id, no HR identity); candidate notification payloads (interview scheduled/cancelled, hiring decision) carry only what the template explicitly reads off its context, so an AI score, rank, interviewer name/comment, HR note, other candidate's data, or the hiring decision's own `reason` text can never reach one even if it were accidentally attached upstream — asserted by polluted-context tests in `backend/test/notificationTemplates.test.js`.
+- An interviewer (an ordinary employee) sees a candidate's name, the vacancy, the schedule and the CV — never the AI screening score/recommendation/skills, other candidates, or another interviewer's evaluation (`backend/test/interviewVisibility.test.js`). A Hiring Manager, whose job is to weigh that evidence, is the one role allowed to see the AI summary and every interviewer's feedback together — but still never `cv_path` or an application it doesn't have a `candidate_interview_process` for.
 - The `DRAFT -> PUBLISHED` transition and the `public_token` are set only by the backend; a request body cannot influence them.
-- The public application link contains only the random token — no internal id, no HR identity.
-- Applicant submissions never touch Supabase directly; the browser only talks to the backend, which validates everything (including the CV bytes).
-- Backend error responses never include stack traces, SQL errors, or Supabase internals.
-- CORS reflects an origin only if it is explicitly configured or is a localhost / private-LAN address; public internet origins are rejected unless added to `CORS_ORIGINS`.
+- Applicant submissions never touch Supabase directly; the browser only talks to the backend, which validates every field and the CV bytes (magic-byte + extension check, not just the claimed MIME type) before anything is stored.
+
+**Input handling**
+- CSV export (`backend/src/utils/csv.js`) neutralises spreadsheet formula injection: any cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return is prefixed with an apostrophe *before* quoting.
+- Every `LIKE`/`ilike` search term is escaped for both the wildcard characters (`%`, `_`) and PostgREST's `or()` grammar (quotes, backslashes) before being interpolated into a filter.
+- CV storage paths are a fresh UUID per upload, never derived from the applicant's filename — no path traversal or collision is possible.
+- Both public, unauthenticated write/read endpoints under `/api/public` are per-IP rate-limited (`backend/src/middleware/rateLimit.js`); every other route requires a valid Supabase bearer token first.
+
+**Operational**
+- Backend error responses never include stack traces, SQL errors, or Supabase internals — the generic handler always returns a fixed message, with details only in the server-side console log (as ids and short messages, never CV text, prompts, or full request bodies).
+- CORS reflects an origin only if it is explicitly configured, a localhost/private-LAN address, or the deployed frontend's own origin; arbitrary public internet origins are rejected unless added to `CORS_ORIGINS`.
 
 ## Remaining Sprint 1 work
 

@@ -5,12 +5,18 @@ const interviewService = require('../services/interview.service');
 const screeningService = require('../services/screening/screeningService');
 const { toScreeningView } = require('./screening.controller');
 const { normalizeApplicationIds } = require('../utils/candidateSelection');
+const { toVacancyErrorResponse } = require('../utils/vacancyOwnershipError');
 
 // A VacancyError (FORBIDDEN when the vacancy belongs to another HR user, etc.)
-// translates straight to a response; anything else is an unexpected failure.
+// translates to a response (FORBIDDEN becomes 404 — see
+// toVacancyErrorResponse); anything else is an unexpected failure. This is
+// the fallback for any handler below that doesn't already have its own
+// explicit FORBIDDEN -> 404 translation before reaching here (e.g.
+// listVacancyApplications).
 function handleError(res, err, label) {
   if (err && err.isVacancyError) {
-    return errorResponse(res, err.status, err.code, err.message);
+    const { status, code, message } = toVacancyErrorResponse(err);
+    return errorResponse(res, status, code, message);
   }
   console.error(`${label} failed:`, err.message);
   return errorResponse(res, 500, 'INTERNAL_ERROR', 'Something went wrong. Please try again.');
