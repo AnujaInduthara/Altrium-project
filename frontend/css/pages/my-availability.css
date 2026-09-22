@@ -1,0 +1,62 @@
+/* ============================================================================
+   My Availability page (PB-13) — an employee publishes their own interview
+   availability. Reuses card / button / field / empty-state; only the add-form
+   grid and the date-grouped slot list live here.
+   ========================================================================== */
+
+.availability-form-card {
+  margin-bottom: var(--space-5);
+}
+
+.availability-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.availability-form__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+#availability-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.availability-group__date {
+  font-size: var(--text-base);
+  font-weight: 700;
+  margin-bottom: var(--space-3);
+}
+
+.availability-group__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.availability-slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.availability-slot__time {
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .availability-form__grid {
+    grid-template-columns: 1fr;
+  }
+}

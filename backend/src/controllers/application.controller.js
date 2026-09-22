@@ -226,9 +226,32 @@ async function selectCandidates(req, res) {
   }
 }
 
+// PATCH /api/applications/:id/status — HR only, owner-checked. Body:
+// { status, hr_note? }. Moves the application through the PB-07 status
+// lifecycle (see backend/src/utils/applicationStatus.js). The AI screening
+// pipeline never calls this — it is an explicit, authenticated HR decision.
+async function updateApplicationStatus(req, res) {
+  try {
+    const { status, hr_note } = req.body || {};
+    const application = await applicationService.updateApplicationStatus({
+      applicationId: req.params.id,
+      nextStatus: status,
+      hrNote: hr_note,
+      authUserId: req.user.id,
+    });
+    return successResponse(res, application);
+  } catch (err) {
+    if (err && err.isApplicationError) {
+      return errorResponse(res, err.status, err.code, err.message);
+    }
+    return handleError(res, err, 'updateApplicationStatus');
+  }
+}
+
 module.exports = {
   listVacancyApplications,
   getApplicationCv,
   getApplicationReview,
   selectCandidates,
+  updateApplicationStatus,
 };

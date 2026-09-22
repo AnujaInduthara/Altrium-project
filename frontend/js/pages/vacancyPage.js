@@ -29,6 +29,7 @@ const closeModal = createModal(document.getElementById('close-modal'));
 const vacancyId = readParam('id');
 
 let publishing = false;
+let closing = false;
 let currentStatus = 'draft';
 
 const $ = (id) => document.getElementById(id);
@@ -93,6 +94,7 @@ function render(vacancy) {
   $('published-links').hidden = !isPublished;
   $('closed-note').hidden = !isClosed;
   $('copy-btn').disabled = !isPublished;
+  $('close-btn').hidden = !isPublished;
 
   if (isPublished) {
     $('public-url').value = vacancy.public_url || '';

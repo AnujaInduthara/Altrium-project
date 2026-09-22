@@ -16,6 +16,10 @@ router.get('/:id/cv', applicationController.getApplicationCv);
 // summary + stored AI screening result), owner-checked.
 router.get('/:id/review', applicationController.getApplicationReview);
 
+// PB-07 — move an application through the HR status lifecycle (Applicant
+// Review's decision panel).
+router.patch('/:id/status', applicationController.updateApplicationStatus);
+
 // PB-05 — read the AI screening result, or (HR-authorized) retry a failed one.
 // AI screening is otherwise a system function: there is no endpoint that lets a
 // client trigger screening for an arbitrary application.

@@ -1,7 +1,10 @@
-// Pure, DB-free validation for a PB-07 candidate-selection request. This is the
-// security-relevant core: given the raw `applicationIds` from the request body
-// and the set of applications that actually belong to the target vacancy, decide
-// exactly which ones may transition 'submitted' -> 'selected'.
+// Pure, DB-free validation for a PB-07 bulk candidate-selection request. This
+// is the security-relevant core: given the raw `applicationIds` from the
+// request body and the set of applications that actually belong to the target
+// vacancy, decide exactly which ones may transition to 'selected'. Eligibility
+// is delegated to canTransition() in applicationStatus.js, so this bulk path
+// and the single-application PATCH .../status endpoint share one definition of
+// which statuses can become 'selected'.
 //
 // Nothing here trusts the client: an id the caller sent that is not among the
 // vacancy's own applications is rejected outright (it could be an application
@@ -11,11 +14,8 @@
 //   partitionSelection(ids, vacancyApplications) ->
 //     { invalid[], alreadySelected[], ineligible[{id,status}], eligible[] }
 
-const {
-  CANDIDATE_SELECTABLE_FROM,
-  MAX_CANDIDATE_SELECTION,
-  APPLICATION_STATUS,
-} = require('../config/applicationOptions');
+const { MAX_CANDIDATE_SELECTION, APPLICATION_STATUS } = require('../config/applicationOptions');
+const { canTransition } = require('./applicationStatus');
 
 // Accepts an array of non-empty strings, trims them, drops blanks and
 // duplicates, and enforces the batch cap. Order is preserved.
@@ -83,7 +83,7 @@ function partitionSelection(ids, vacancyApplications) {
       invalid.push(id);
     } else if (application.status === APPLICATION_STATUS.SELECTED) {
       alreadySelected.push(id);
-    } else if (!CANDIDATE_SELECTABLE_FROM.includes(application.status)) {
+    } else if (!canTransition(application.status, APPLICATION_STATUS.SELECTED)) {
       ineligible.push({ id, status: application.status });
     } else {
       eligible.push(id);

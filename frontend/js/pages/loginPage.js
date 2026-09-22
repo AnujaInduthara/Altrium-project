@@ -7,11 +7,37 @@ import { createPasswordField } from '../components/PasswordField.js';
 import { createAlert } from '../components/Alert.js';
 import { validateLoginForm } from '../utils/validators.js';
 
-const DASHBOARD_PAGE = 'dashboard.html';
+const DEFAULT_HOME_PAGE = 'dashboard.html';
+
+// Where each role lands after signing in. Sprint 2 builds the non-HR pages;
+// linking to them now (rather than stubbing them) is deliberate — see
+// DEVELOPMENT_PLAN.md Step 2.1.
+const ROLE_HOME_PAGES = {
+  hr: 'dashboard.html',
+  employee: 'employee-dashboard.html',
+  hiring_manager: 'hiring-dashboard.html',
+  management: 'reports.html',
+};
+
+// Already signed in? Skip the form and go straight to this role's home page.
+// Role-aware (not a flat redirect to dashboard.html) so a non-HR session
+// doesn't bounce here -> dashboard.html -> requireSession failure -> here.
+async function redirectIfSignedIn() {
+  const session = await AuthService.getSession();
+  if (!session) return;
+
+  const { ok, body } = await AuthService.fetchProfile(session.access_token);
+  if (ok) {
+    window.location.replace(ROLE_HOME_PAGES[body.data.role] || DEFAULT_HOME_PAGE);
+    return;
+  }
+  // Session exists but the profile is gone/inactive — clear it quietly so the
+  // form below works instead of looping. No error shown; nothing was submitted.
+  await AuthService.signOut();
+}
 
 function initLoginPage() {
-  // Already signed in? Skip the form.
-  AuthService.redirectIfAuthenticated(DASHBOARD_PAGE);
+  redirectIfSignedIn();
 
   const form = document.getElementById('login-form');
   const email = createTextField(document.querySelector('[data-field="email"]'));
@@ -61,17 +87,17 @@ function initLoginPage() {
         return;
       }
 
-      const { ok, status, body } = await AuthService.fetchHRProfile(
+      const { ok, status, body } = await AuthService.fetchProfile(
         data.session.access_token
       );
 
       if (ok) {
-        window.location.replace(DASHBOARD_PAGE);
+        window.location.replace(ROLE_HOME_PAGES[body.data.role] || DEFAULT_HOME_PAGE);
         return;
       }
 
       if (status === 403) {
-        alert.error('You are not authorized to access the HR portal.');
+        alert.error('You are not authorized to access this app.');
       } else if (status === 401) {
         alert.error('Invalid email or password.');
       } else {

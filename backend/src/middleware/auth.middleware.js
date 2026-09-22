@@ -20,17 +20,28 @@ async function authenticateUser(req, res, next) {
   next();
 }
 
-// Must run after authenticateUser. Confirms the authenticated user has an HR
-// profile before allowing access to HR-only routes.
-async function requireHR(req, res, next) {
-  const profile = await getProfileByAuthUserId(req.user.id);
+// Must run after authenticateUser. Confirms the authenticated user has a
+// profile whose role is one of `allowedRoles`, and that the profile is
+// active, before allowing access. Never trusts a client-supplied role — it
+// only ever comes from the profiles table.
+function requireRole(...allowedRoles) {
+  return async function requireRoleMiddleware(req, res, next) {
+    const profile = await getProfileByAuthUserId(req.user.id);
 
-  if (!profile || profile.role !== 'hr') {
-    return errorResponse(res, 403, 'FORBIDDEN', 'You are not authorized to access the HR portal.');
-  }
+    if (!profile || !allowedRoles.includes(profile.role)) {
+      return errorResponse(res, 403, 'FORBIDDEN', 'You are not authorized to access this resource.');
+    }
+    if (profile.is_active === false) {
+      return errorResponse(res, 403, 'FORBIDDEN', 'This account is inactive.');
+    }
 
-  req.profile = profile;
-  next();
+    req.profile = profile;
+    next();
+  };
 }
 
-module.exports = { authenticateUser, requireHR };
+// Every existing HR route keeps working unchanged: requireHR is just
+// requireRole('hr') under its original name.
+const requireHR = requireRole('hr');
+
+module.exports = { authenticateUser, requireHR, requireRole };

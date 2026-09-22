@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interviews — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app" data-active-nav="interviews">
+    <section class="page" id="interviews-page" hidden>
+      <header class="page-header">
+        <h1 class="page-header__title">Interviews</h1>
+        <p class="page-header__subtitle">Upcoming interviews scheduled across your vacancies.</p>
+      </header>
+
+      <div class="alert" id="interviews-alert" role="alert" aria-live="assertive" hidden></div>
+
+      <p class="status-message" id="interviews-loading" role="status">Loading interviews…</p>
+
+      <div class="card empty-state" id="interviews-empty" hidden>
+        <h2 class="heading-lg">No interviews scheduled yet</h2>
+        <p class="text-muted">
+          Schedule an interview from a selected candidate's interview setup page.
+        </p>
+      </div>
+
+      <div class="card" id="interviews-error" hidden>
+        <h1 class="heading-lg">Unable to load interviews</h1>
+        <p class="text-muted" id="interviews-error-message">
+          Please check your connection and try again.
+        </p>
+        <p>
+          <button type="button" class="button button--primary" id="interviews-retry">
+            Try again
+          </button>
+        </p>
+      </div>
+
+      <div id="interview-groups"></div>
+    </section>
+  </div>
+
+  <!-- Cancel confirmation -->
+  <div class="modal" id="cancel-interview-modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="cancel-interview-modal-title">
+      <h2 class="modal__title" id="cancel-interview-modal-title">Cancel this interview?</h2>
+      <p class="modal__body" id="cancel-interview-modal-body"></p>
+      <div class="modal__actions">
+        <button type="button" class="button button--ghost" data-close>Keep interview</button>
+        <button type="button" class="button button--danger" id="confirm-cancel-interview-btn" data-autofocus>
+          <span data-label>Cancel Interview</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/interviewsPage.js"></script>
+</body>
+</html>
