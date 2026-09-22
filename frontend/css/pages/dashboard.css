@@ -24,6 +24,27 @@
   margin-top: var(--space-2);
 }
 
+.dashboard-overview__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.dashboard-overview__link {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.dashboard-overview__link:hover {
+  text-decoration: underline;
+}
+
 @keyframes page-fade {
   from {
     opacity: 0;
