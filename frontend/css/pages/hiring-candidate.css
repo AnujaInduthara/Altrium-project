@@ -14,9 +14,88 @@
   margin-top: var(--space-3);
 }
 
-#decision-panel-placeholder {
-  border-style: dashed;
-  background: var(--color-surface-muted);
+/* Hiring decision panel (PB-21) -------------------------------------------- */
+
+#decision-decided {
+  margin-bottom: var(--space-4);
+}
+
+.decision-choice-field {
+  margin-bottom: var(--space-4);
+}
+
+.decision-choice {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.decision-choice__option {
+  position: relative;
+  flex: 1 1 10rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.decision-choice__option:hover {
+  border-color: var(--color-primary);
+}
+
+.decision-choice__input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.decision-choice__option--hire:has(.decision-choice__input:checked) {
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.decision-choice__option--reject:has(.decision-choice__input:checked) {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.field.is-invalid .decision-choice__option {
+  border-color: var(--color-danger);
+}
+
+.hiring-acknowledge {
+  padding: var(--space-4);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+  margin-bottom: var(--space-4);
+}
+
+.hiring-outstanding-list {
+  margin: var(--space-2) 0 var(--space-3);
+  padding-left: 1.25rem;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.hiring-acknowledge__label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .hiring-stage-card {

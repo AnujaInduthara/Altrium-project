@@ -52,4 +52,20 @@ export const HiringService = {
     );
     return toResult(response);
   },
+
+  // PB-21 — record the final Hire/Reject decision. One per candidate, ever —
+  // a second call returns 409 DECISION_EXISTS. `acknowledge_incomplete` +
+  // a non-blank `reason` are required when any interview stage isn't yet
+  // completed/skipped, else the server returns 409 STAGES_INCOMPLETE.
+  async decide(applicationId, { decision, reason, acknowledge_incomplete } = {}) {
+    const response = await fetch(
+      `${apiBase}/hiring/candidates/${encodeURIComponent(applicationId)}/decision`,
+      {
+        method: 'POST',
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ decision, reason, acknowledge_incomplete }),
+      }
+    );
+    return toResult(response);
+  },
 };

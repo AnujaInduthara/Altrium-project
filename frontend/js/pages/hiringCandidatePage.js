@@ -1,12 +1,13 @@
-// Hiring Candidate detail page (PB-20) — a Hiring Manager reads the full
-// picture for one candidate: the AI screening summary and every interview
-// stage's ratings/comments from every interviewer. Read-only — the decision
-// panel is a placeholder here; Step 5.2 (PB-21) fills it in.
+// Hiring Candidate detail page (PB-20/PB-21) — a Hiring Manager reads the
+// full picture for one candidate: the AI screening summary and every
+// interview stage's ratings/comments from every interviewer, then records
+// the final Hire/Reject decision.
 
 import { AuthService } from '../services/authService.js';
 import { HiringService } from '../services/hiringService.js';
 import { mountAppShell } from '../components/AppShell.js';
 import { createAlert } from '../components/Alert.js';
+import { createModal } from '../components/Modal.js';
 import { readParam } from '../utils/urlParams.js';
 
 const LOGIN_PAGE = 'login.html';
@@ -72,7 +73,26 @@ const alert = createAlert($('candidate-alert'));
 const stageTemplate = $('stage-card-template');
 const evaluationTemplate = $('evaluation-card-template');
 
+const decisionForm = $('decision-form');
+const decisionDecidedEl = $('decision-decided');
+const decisionErrorEl = $('decision-error');
+const reasonInput = $('decision-reason');
+const reasonRequiredEl = $('decision-reason-required');
+const reasonErrorEl = $('decision-reason-error');
+const reasonFieldRoot = document.querySelector('[data-field="reason"]');
+const decisionFieldRoot = document.querySelector('[data-field="decision"]');
+const acknowledgeWrap = $('decision-acknowledge-wrap');
+const acknowledgeCheckbox = $('decision-acknowledge');
+const outstandingListEl = $('decision-outstanding-list');
+const decisionModal = createModal($('decision-modal'));
+
 const applicationId = readParam('id');
+let pendingDecisionInput = null;
+let decidingSubmitting = false;
+// 'management' can read everything on this page but never decides (Step
+// 5.2's rule — the backend also enforces this with its own stricter
+// requireRole on the decision route); set once auth resolves.
+let canDecide = false;
 
 function text(id, value) {
   $(id).textContent = value == null || value === '' ? '—' : String(value);
@@ -159,6 +179,148 @@ function renderScreening(screening) {
   text('screening-summary-text', screening.summary || 'No summary was generated.');
 }
 
+// --- hiring decision (PB-21) ----------------------------------------------
+
+function clearDecisionErrors() {
+  decisionFieldRoot.classList.remove('is-invalid');
+  decisionErrorEl.textContent = '';
+  reasonFieldRoot.classList.remove('is-invalid');
+  reasonErrorEl.textContent = '';
+}
+
+function resetDecisionForm() {
+  decisionForm.reset();
+  clearDecisionErrors();
+  acknowledgeWrap.hidden = true;
+  acknowledgeCheckbox.checked = false;
+  reasonRequiredEl.hidden = true;
+  outstandingListEl.replaceChildren();
+}
+
+function renderDecision(decision) {
+  if (decision) {
+    decisionForm.hidden = true;
+    decisionDecidedEl.hidden = false;
+    text('decision-decided-by', decision.decided_by_name);
+    const decidedAt = new Date(decision.decided_at);
+    text('decision-decided-at', Number.isNaN(decidedAt.getTime()) ? decision.decided_at : decidedAt.toLocaleString());
+    text('decision-decided-reason', decision.reason || 'No reason given.');
+    return;
+  }
+
+  decisionDecidedEl.hidden = true;
+  $('decision-readonly-note').hidden = canDecide;
+  decisionForm.hidden = !canDecide;
+  if (canDecide) resetDecisionForm();
+}
+
+function showOutstandingStages(stages) {
+  acknowledgeWrap.hidden = false;
+  reasonRequiredEl.hidden = false;
+  outstandingListEl.replaceChildren(
+    ...(stages || []).map((s) => {
+      const li = document.createElement('li');
+      li.textContent = `${s.stage_name} (${s.status})`;
+      return li;
+    })
+  );
+}
+
+decisionForm.querySelectorAll('input[name="decision"]').forEach((input) =>
+  input.addEventListener('change', clearDecisionErrors)
+);
+reasonInput.addEventListener('input', () => {
+  reasonFieldRoot.classList.remove('is-invalid');
+  reasonErrorEl.textContent = '';
+});
+
+decisionForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  clearDecisionErrors();
+
+  const decisionInput = decisionForm.querySelector('input[name="decision"]:checked');
+  if (!decisionInput) {
+    decisionFieldRoot.classList.add('is-invalid');
+    decisionErrorEl.textContent = 'Please choose Hire or Reject.';
+    return;
+  }
+
+  const reason = reasonInput.value.trim();
+  const needsAcknowledgement = !acknowledgeWrap.hidden;
+
+  if (needsAcknowledgement && !acknowledgeCheckbox.checked) {
+    alert.error('Please acknowledge the incomplete stages before deciding, or wait until every stage is complete.');
+    return;
+  }
+  if (needsAcknowledgement && !reason) {
+    reasonFieldRoot.classList.add('is-invalid');
+    reasonErrorEl.textContent = 'A reason is required when deciding with incomplete stages.';
+    return;
+  }
+
+  pendingDecisionInput = {
+    decision: decisionInput.value,
+    reason,
+    acknowledge_incomplete: needsAcknowledgement && acknowledgeCheckbox.checked,
+  };
+
+  const verb = decisionInput.value === 'hired' ? 'hire' : 'reject';
+  $('decision-modal-body').textContent =
+    `This will ${verb} the candidate, notify HR and the candidate, and cannot be undone. Continue?`;
+  decisionModal.open();
+});
+
+async function confirmDecision() {
+  if (decidingSubmitting || !pendingDecisionInput) return;
+  decidingSubmitting = true;
+
+  const confirmBtn = $('confirm-decision-btn');
+  const confirmLabel = confirmBtn.querySelector('[data-label]');
+  confirmBtn.disabled = true;
+  confirmLabel.textContent = 'Recording…';
+
+  try {
+    const { ok, status, body } = await HiringService.decide(applicationId, pendingDecisionInput);
+    decisionModal.close();
+
+    if (status === 401) {
+      await AuthService.signOut();
+      window.location.replace(LOGIN_PAGE);
+      return;
+    }
+
+    if (ok && body?.data) {
+      alert.success('The hiring decision has been recorded.');
+      await load();
+      return;
+    }
+
+    if (status === 409 && body?.error?.code === 'STAGES_INCOMPLETE') {
+      showOutstandingStages(body.error.outstanding_stages);
+      alert.error(body?.error?.message || 'One or more interview stages are not yet completed.');
+      return;
+    }
+
+    if (status === 409 && body?.error?.code === 'DECISION_EXISTS') {
+      alert.error(body?.error?.message || 'A hiring decision has already been recorded for this candidate.');
+      await load();
+      return;
+    }
+
+    alert.error(body?.error?.message || 'Unable to record the decision. Please try again.');
+  } catch (err) {
+    decisionModal.close();
+    alert.error('Unable to record the decision. Please check your connection and try again.');
+  } finally {
+    decidingSubmitting = false;
+    pendingDecisionInput = null;
+    confirmBtn.disabled = false;
+    confirmLabel.textContent = 'Confirm Decision';
+  }
+}
+
+$('confirm-decision-btn').addEventListener('click', confirmDecision);
+
 function render({ application, vacancy, screening, stages, decision }) {
   text('candidate-name', application.full_name || 'Candidate');
   const subtitleParts = [application.email, application.location].filter(Boolean);
@@ -189,12 +351,12 @@ function render({ application, vacancy, screening, stages, decision }) {
       : null
   );
 
-  // `decision` is always null until Step 5.2 (PB-21) exists, which reads as pending here.
   const decisionKey = decision?.status || 'pending';
   const decisionEl = $('candidate-decision');
   decisionEl.textContent = DECISION_LABELS[decisionKey] || decisionKey;
   decisionEl.classList.remove('badge--neutral', 'badge--warning', 'badge--success', 'badge--danger');
   decisionEl.classList.add(DECISION_BADGE_CLASSES[decisionKey] || 'badge--neutral');
+  renderDecision(decision);
 
   renderScreening(screening);
 
@@ -254,6 +416,7 @@ async function load() {
   if (!result) return; // already redirected
 
   shell.setUser({ email: result.profile.email, role: result.profile.role });
+  canDecide = result.profile.role === 'hiring_manager';
   page.hidden = false;
 
   if (!applicationId) {

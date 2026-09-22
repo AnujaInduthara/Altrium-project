@@ -109,16 +109,94 @@
           <p class="review-pending" id="screening-pending-note" hidden></p>
         </div>
 
-        <!-- Step 5.2 (PB-21) fills this with the Hire/Reject decision panel. -->
-        <div class="card" id="decision-panel-placeholder">
-          <h2 class="review-section__title">Decision</h2>
-          <p class="text-muted text-sm">The hiring decision panel will appear here.</p>
+        <div class="card" id="decision-card">
+          <div class="card__header">
+            <h2 class="card__title">Hiring Decision</h2>
+            <p class="card__subtitle">Record the final outcome for this candidate. This cannot be changed once made.</p>
+          </div>
+
+          <div id="decision-decided" hidden>
+            <dl class="review-info">
+              <div class="review-info__row"><dt>Decided by</dt><dd id="decision-decided-by"></dd></div>
+              <div class="review-info__row"><dt>Decided at</dt><dd id="decision-decided-at"></dd></div>
+              <div class="review-info__row"><dt>Reason</dt><dd id="decision-decided-reason"></dd></div>
+            </dl>
+          </div>
+
+          <p class="text-muted text-sm" id="decision-readonly-note" hidden>
+            No decision has been recorded yet. Only a Hiring Manager can decide.
+          </p>
+
+          <form id="decision-form">
+            <fieldset class="field field--plain decision-choice-field" data-field="decision">
+              <legend class="field__label">Decision</legend>
+              <div class="decision-choice">
+                <label class="decision-choice__option decision-choice__option--hire">
+                  <input type="radio" name="decision" value="hired" class="decision-choice__input" />
+                  <span>Hire</span>
+                </label>
+                <label class="decision-choice__option decision-choice__option--reject">
+                  <input type="radio" name="decision" value="rejected" class="decision-choice__input" />
+                  <span>Reject</span>
+                </label>
+              </div>
+              <p class="field__error" id="decision-error" role="alert"></p>
+            </fieldset>
+
+            <div class="field field--plain" data-field="reason">
+              <label class="field__label" for="decision-reason">
+                Reason <span id="decision-reason-required" hidden>(required)</span>
+              </label>
+              <div class="field__control">
+                <textarea
+                  class="field__input"
+                  id="decision-reason"
+                  maxlength="2000"
+                  rows="3"
+                  placeholder="Optional, unless deciding with incomplete interview stages"
+                ></textarea>
+              </div>
+              <p class="field__error" id="decision-reason-error" role="alert"></p>
+            </div>
+
+            <div class="field field--plain hiring-acknowledge" id="decision-acknowledge-wrap" hidden>
+              <p class="text-muted text-sm">
+                These interview stages are not yet completed:
+              </p>
+              <ul class="hiring-outstanding-list" id="decision-outstanding-list"></ul>
+              <label class="hiring-acknowledge__label">
+                <input type="checkbox" id="decision-acknowledge" />
+                <span>I understand and want to decide anyway.</span>
+              </label>
+            </div>
+
+            <div class="review-decision__actions">
+              <button type="submit" class="button button--primary" id="decision-submit-btn">
+                <span data-label>Record Decision</span>
+              </button>
+            </div>
+          </form>
         </div>
 
         <h2 class="review-section__title" id="stages-heading">Interview Stages</h2>
         <div id="stage-cards"></div>
       </div>
     </section>
+  </div>
+
+  <!-- Decision confirmation -->
+  <div class="modal" id="decision-modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="decision-modal-title">
+      <h2 class="modal__title" id="decision-modal-title">Confirm this decision?</h2>
+      <p class="modal__body" id="decision-modal-body"></p>
+      <div class="modal__actions">
+        <button type="button" class="button button--ghost" data-close>Cancel</button>
+        <button type="button" class="button button--primary" id="confirm-decision-btn" data-autofocus>
+          <span data-label>Confirm Decision</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <template id="stage-card-template">

@@ -31,8 +31,23 @@ const ILLEGAL = [
   ['selected', 'submitted'],
   ['selected', 'under_review'],
   ['selected', 'shortlisted'],
-  ['selected', 'rejected'],
   ['selected', 'selected'],
+  // hired is terminal (PB-21) — no legal transition ever leaves it.
+  ['hired', 'submitted'],
+  ['hired', 'under_review'],
+  ['hired', 'shortlisted'],
+  ['hired', 'rejected'],
+  ['hired', 'selected'],
+  ['hired', 'hired'],
+];
+
+// PB-21: the Hiring Manager's audited decision is the only path that ever
+// exercises these — see hiringDecision.service.js. Legal here (the shared
+// state machine), even though application.service.js's ordinary HR status
+// endpoint independently refuses 'hired' regardless of what this allows.
+const NEW_HIRING_DECISION_TRANSITIONS = [
+  ['selected', 'hired'],
+  ['selected', 'rejected'],
 ];
 
 test('canTransition allows every legal transition', () => {
@@ -49,6 +64,12 @@ test('canTransition rejects every illegal transition, including same-state', () 
 
 test('canTransition rejects an unknown current status (fails closed)', () => {
   assert.equal(canTransition('archived', 'under_review'), false);
+});
+
+test('canTransition allows the new PB-21 hiring-decision transitions', () => {
+  for (const [from, to] of NEW_HIRING_DECISION_TRANSITIONS) {
+    assert.equal(canTransition(from, to), true, `${from} -> ${to} should be legal`);
+  }
 });
 
 // --- validateStatusChange -----------------------------------------------

@@ -75,10 +75,10 @@ async function loadStagesAndEvaluations(processIds) {
   return { stagesByProcess, evaluationsByStage };
 }
 
-// PB-20 — every candidate with an interview process, across a SMALL FIXED
-// NUMBER of batched queries (no per-candidate loop): processes, then
-// applications/vacancies/screenings/stages/evaluations each `in (...)` once.
-// `status` filters on the decision status ('pending' until Step 5.2 exists).
+// PB-20/PB-21 — every candidate with an interview process, across a SMALL
+// FIXED NUMBER of batched queries (no per-candidate loop): processes, then
+// applications/vacancies/screenings/decisions/stages/evaluations each
+// `in (...)` once. `status` filters on the decision status.
 async function listCandidates({ vacancyId, status } = {}) {
   let processQuery = supabaseAdmin
     .from('candidate_interview_processes')
@@ -93,21 +93,26 @@ async function listCandidates({ vacancyId, status } = {}) {
   const vacancyIds = uniq(processes.map((p) => p.vacancy_id));
   const processIds = processes.map((p) => p.id);
 
-  const [applicationsResult, vacanciesResult, screeningsResult, { stagesByProcess, evaluationsByStage }] =
+  const [applicationsResult, vacanciesResult, screeningsResult, decisionsResult, { stagesByProcess, evaluationsByStage }] =
     await Promise.all([
       supabaseAdmin.from('applications').select('id, full_name').in('id', applicationIds),
       supabaseAdmin.from('job_vacancies').select('id, job_title, department').in('id', vacancyIds),
       supabaseAdmin.from('application_screenings').select('application_id, score').in('application_id', applicationIds),
+      supabaseAdmin.from('hiring_decisions').select('application_id, decision').in('application_id', applicationIds),
       loadStagesAndEvaluations(processIds),
     ]);
 
   if (applicationsResult.error) throw wrapDbError('Failed to load applications', applicationsResult.error);
   if (vacanciesResult.error) throw wrapDbError('Failed to load vacancies', vacanciesResult.error);
   if (screeningsResult.error) throw wrapDbError('Failed to load screenings', screeningsResult.error);
+  if (decisionsResult.error) throw wrapDbError('Failed to load hiring decisions', decisionsResult.error);
 
   const applicationById = new Map((applicationsResult.data || []).map((a) => [a.id, a]));
   const vacancyById = new Map((vacanciesResult.data || []).map((v) => [v.id, v]));
   const screeningByApplication = new Map((screeningsResult.data || []).map((s) => [s.application_id, s]));
+  const decisionByApplication = new Map(
+    (decisionsResult.data || []).map((d) => [d.application_id, { status: d.decision }])
+  );
 
   let rows = processes
     .map((process) => {
@@ -123,9 +128,7 @@ async function listCandidates({ vacancyId, status } = {}) {
         screening: screeningByApplication.get(process.application_id) || null,
         stages,
         evaluations,
-        // No hiring_decisions table until Step 5.2 — every candidate is
-        // decision-pending for now.
-        decision: null,
+        decision: decisionByApplication.get(process.application_id) || null,
       });
     })
     .filter(Boolean);
@@ -137,11 +140,12 @@ async function listCandidates({ vacancyId, status } = {}) {
   return sortCandidates(rows);
 }
 
-// PB-20 — full detail for one candidate: every stage with its interview
-// schedule and every interviewer's evaluation, plus the raw AI screening row
-// (the controller shapes it via screening.controller's toScreeningView) and
-// the application/vacancy fields the page needs. Explicit column lists only;
-// cv_path is never included here (see getCvAccess for the signed-URL path).
+// PB-20/PB-21 — full detail for one candidate: every stage with its interview
+// schedule and every interviewer's evaluation, the raw AI screening row (the
+// controller shapes it via screening.controller's toScreeningView), the
+// application/vacancy fields the page needs, and the hiring decision (if
+// any). Explicit column lists only; cv_path is never included here (see
+// resolveCandidateForCv for the signed-URL path).
 async function getCandidate({ applicationId }) {
   const { data: process, error: processError } = await supabaseAdmin
     .from('candidate_interview_processes')
@@ -159,7 +163,7 @@ async function getCandidate({ applicationId }) {
     throw new HiringError('CANDIDATE_NOT_FOUND', 404, 'This candidate could not be found.');
   }
 
-  const [applicationResult, vacancyResult, screeningResult, stagesResult] = await Promise.all([
+  const [applicationResult, vacancyResult, screeningResult, stagesResult, decisionResult] = await Promise.all([
     supabaseAdmin
       .from('applications')
       .select('id, full_name, email, phone, location, status, created_at')
@@ -184,12 +188,21 @@ async function getCandidate({ applicationId }) {
       .select('id, stage_name, stage_order, status, duration_minutes')
       .eq('process_id', process.id)
       .order('stage_order', { ascending: true }),
+    // hiring_manager_profile_id -> profiles(full_name): a single FK, so the
+    // embed resolves unambiguously (same pattern as the evaluations query
+    // below for interviewer_profile_id).
+    supabaseAdmin
+      .from('hiring_decisions')
+      .select('decision, reason, decided_at, profiles!hiring_manager_profile_id(full_name)')
+      .eq('application_id', applicationId)
+      .maybeSingle(),
   ]);
 
   if (applicationResult.error) throw wrapDbError('Failed to load application', applicationResult.error);
   if (vacancyResult.error) throw wrapDbError('Failed to load vacancy', vacancyResult.error);
   if (screeningResult.error) throw wrapDbError('Failed to load screening', screeningResult.error);
   if (stagesResult.error) throw wrapDbError('Failed to load interview stages', stagesResult.error);
+  if (decisionResult.error) throw wrapDbError('Failed to load hiring decision', decisionResult.error);
 
   if (!applicationResult.data) {
     throw new HiringError('CANDIDATE_NOT_FOUND', 404, 'This candidate could not be found.');
@@ -260,13 +273,21 @@ async function getCandidate({ applicationId }) {
     };
   });
 
+  const decisionRow = decisionResult.data;
+
   return {
     application: applicationResult.data,
     vacancy: vacancyResult.data || null,
     screening: screeningResult.data || null,
     stages: stageViews,
-    // No hiring_decisions table until Step 5.2.
-    decision: null,
+    decision: decisionRow
+      ? {
+          status: decisionRow.decision,
+          reason: decisionRow.reason,
+          decided_at: decisionRow.decided_at,
+          decided_by_name: decisionRow.profiles?.full_name || null,
+        }
+      : null,
   };
 }
 

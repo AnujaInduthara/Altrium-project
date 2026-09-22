@@ -351,6 +351,20 @@ async function selectCandidates({ vacancyId, applicationIds, hrUserId }) {
 // caller (an HR user) owns via its parent vacancy. Never called for the AI
 // screening pipeline — screening is advisory and never writes status.
 async function updateApplicationStatus({ applicationId, nextStatus, hrNote, authUserId }) {
+  // 'hired' is only ever set by the Hiring Manager's audited decision
+  // (hiringDecision.service.js), which inserts a hiring_decisions row in the
+  // same operation. Refusing it here — even though applicationStatus.js's
+  // ALLOWED_TRANSITIONS now permits selected -> hired for that other path —
+  // keeps this ordinary HR endpoint from ever producing a 'hired' application
+  // with no decision record behind it.
+  if (nextStatus === APPLICATION_STATUS.HIRED) {
+    throw new ApplicationError(
+      'INVALID_STATUS_TRANSITION',
+      409,
+      'Hiring decisions are made from the Hiring Dashboard, not here.'
+    );
+  }
+
   const application = await getApplicationById(applicationId);
   if (!application) {
     throw new ApplicationError('APPLICATION_NOT_FOUND', 404, 'This application could not be found.');

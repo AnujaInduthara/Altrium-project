@@ -32,7 +32,14 @@ const ALLOWED_TRANSITIONS = Object.freeze({
     APPLICATION_STATUS.REJECTED,
   ],
   [APPLICATION_STATUS.REJECTED]: [APPLICATION_STATUS.UNDER_REVIEW],
-  [APPLICATION_STATUS.SELECTED]: [],
+  // PB-21: the Hiring Manager's audited decision (hiringDecision.service.js)
+  // is the only path that ever exercises these two — the ordinary HR status
+  // endpoint (application.service.js's updateApplicationStatus) explicitly
+  // refuses 'hired' as a target regardless of what this table allows, so a
+  // hire always carries a hiring_decisions row.
+  [APPLICATION_STATUS.SELECTED]: [APPLICATION_STATUS.HIRED, APPLICATION_STATUS.REJECTED],
+  // Terminal: no legal transition ever leaves 'hired'.
+  [APPLICATION_STATUS.HIRED]: [],
 });
 
 function canTransition(from, to) {
