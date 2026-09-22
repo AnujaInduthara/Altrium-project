@@ -90,4 +90,75 @@ function toFunnelPercentages(funnel = []) {
   }));
 }
 
-module.exports = { buildPipeline, toFunnelPercentages };
+// ---------------------------------------------------------------------------
+// PB-24 — the recruitment report: totals for the period + a per-vacancy
+// breakdown. Shares the HR Selected definition above; adds
+// "Interviews Completed" (a count of completed INTERVIEW ROWS, not distinct
+// candidates — a vacancy where the same candidate had two completed
+// interviews counts 2 here, unlike the funnel's "Interviews" stage which
+// counts candidates once regardless of how many interviews they had).
+//
+// applications : [{ id, status, vacancy_id }]
+// screenings   : [{ application_id, status }]
+// interviews   : [{ application_id, status }]  — status checked for 'completed'
+// decisions    : [{ application_id, decision }]
+// vacancies    : [{ id, job_title, department }]  — in-range vacancies
+function buildRecruitmentReport({ applications = [], screenings = [], interviews = [], decisions = [], vacancies = [] } = {}) {
+  const screeningByApplication = new Map(screenings.map((s) => [s.application_id, s]));
+  const decisionByApplication = new Map(decisions.map((d) => [d.application_id, d]));
+
+  const completedInterviewCountByApplication = new Map();
+  for (const interview of interviews) {
+    if (interview.status !== 'completed') continue;
+    completedInterviewCountByApplication.set(
+      interview.application_id,
+      (completedInterviewCountByApplication.get(interview.application_id) || 0) + 1
+    );
+  }
+
+  function metricsFor(apps) {
+    const aiShortlisted = apps.filter((a) => screeningByApplication.get(a.id)?.status === 'completed').length;
+    const hrSelected = apps.filter((a) => {
+      if (HR_SELECTED_DIRECT_STATUSES.has(a.status)) return true;
+      return a.status === 'rejected' && decisionByApplication.get(a.id)?.decision === 'rejected';
+    }).length;
+    const interviewsCompleted = apps.reduce(
+      (sum, a) => sum + (completedInterviewCountByApplication.get(a.id) || 0),
+      0
+    );
+    const hired = apps.filter((a) => decisionByApplication.get(a.id)?.decision === 'hired').length;
+    const rejected = apps.filter((a) => decisionByApplication.get(a.id)?.decision === 'rejected').length;
+
+    return {
+      applications: apps.length,
+      ai_shortlisted: aiShortlisted,
+      hr_selected: hrSelected,
+      interviews_completed: interviewsCompleted,
+      hired,
+      rejected,
+    };
+  }
+
+  const totals = {
+    vacancies_created: vacancies.length,
+    ...metricsFor(applications),
+  };
+
+  const applicationsByVacancy = new Map();
+  for (const application of applications) {
+    if (!applicationsByVacancy.has(application.vacancy_id)) applicationsByVacancy.set(application.vacancy_id, []);
+    applicationsByVacancy.get(application.vacancy_id).push(application);
+  }
+
+  const by_vacancy = [...vacancies]
+    .sort((a, b) => (a.job_title || '').localeCompare(b.job_title || ''))
+    .map((vacancy) => ({
+      job_title: vacancy.job_title,
+      department: vacancy.department,
+      ...metricsFor(applicationsByVacancy.get(vacancy.id) || []),
+    }));
+
+  return { totals, by_vacancy };
+}
+
+module.exports = { buildPipeline, toFunnelPercentages, buildRecruitmentReport };

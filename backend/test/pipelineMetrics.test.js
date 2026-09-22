@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { buildPipeline, toFunnelPercentages } = require('../src/utils/pipelineMetrics');
+const { buildPipeline, toFunnelPercentages, buildRecruitmentReport } = require('../src/utils/pipelineMetrics');
 
 const FUNNEL_KEYS = ['applications', 'ai_screening', 'hr_selected', 'interviews', 'final_review', 'hired', 'rejected'];
 
@@ -192,4 +192,97 @@ test('toFunnelPercentages rounds to the nearest whole percent', () => {
 
 test('toFunnelPercentages on an empty funnel array returns an empty array', () => {
   assert.deepEqual(toFunnelPercentages([]), []);
+});
+
+// ---------------------------------------------------------------------------
+// PB-24 — buildRecruitmentReport
+// ---------------------------------------------------------------------------
+
+test('an empty dataset produces all-zero totals and an empty by_vacancy list', () => {
+  const { totals, by_vacancy } = buildRecruitmentReport({});
+  assert.deepEqual(totals, {
+    vacancies_created: 0,
+    applications: 0,
+    ai_shortlisted: 0,
+    hr_selected: 0,
+    interviews_completed: 0,
+    hired: 0,
+    rejected: 0,
+  });
+  assert.deepEqual(by_vacancy, []);
+});
+
+test('totals aggregate across every vacancy, and by_vacancy breaks the same numbers down per vacancy', () => {
+  const vacancies = [
+    { id: 'v1', job_title: 'Backend Engineer', department: 'Engineering' },
+    { id: 'v2', job_title: 'Recruiter', department: 'People' },
+  ];
+  const applications = [
+    { id: 'a1', status: 'hired', vacancy_id: 'v1' },
+    { id: 'a2', status: 'rejected', vacancy_id: 'v1' }, // rejected after selection
+    { id: 'a3', status: 'submitted', vacancy_id: 'v2' },
+  ];
+  const screenings = [
+    { application_id: 'a1', status: 'completed' },
+    { application_id: 'a2', status: 'completed' },
+  ];
+  const interviews = [
+    { application_id: 'a1', status: 'completed' },
+    { application_id: 'a1', status: 'completed' }, // a second completed interview for the same candidate
+    { application_id: 'a2', status: 'scheduled' }, // not completed — must not count
+  ];
+  const decisions = [
+    { application_id: 'a1', decision: 'hired' },
+    { application_id: 'a2', decision: 'rejected' },
+  ];
+
+  const { totals, by_vacancy } = buildRecruitmentReport({ applications, screenings, interviews, decisions, vacancies });
+
+  assert.equal(totals.vacancies_created, 2);
+  assert.equal(totals.applications, 3);
+  assert.equal(totals.ai_shortlisted, 2);
+  assert.equal(totals.hr_selected, 2); // a1 (hired), a2 (rejected-after-selection) — not a3
+  assert.equal(totals.interviews_completed, 2); // both of a1's completed interviews
+  assert.equal(totals.hired, 1);
+  assert.equal(totals.rejected, 1);
+
+  // Sorted alphabetically by job_title: Backend Engineer before Recruiter.
+  assert.deepEqual(
+    by_vacancy.map((v) => v.job_title),
+    ['Backend Engineer', 'Recruiter']
+  );
+
+  const backend = by_vacancy.find((v) => v.job_title === 'Backend Engineer');
+  assert.equal(backend.department, 'Engineering');
+  assert.equal(backend.applications, 2);
+  assert.equal(backend.ai_shortlisted, 2);
+  assert.equal(backend.hr_selected, 2);
+  assert.equal(backend.interviews_completed, 2);
+  assert.equal(backend.hired, 1);
+  assert.equal(backend.rejected, 1);
+
+  const recruiter = by_vacancy.find((v) => v.job_title === 'Recruiter');
+  assert.equal(recruiter.applications, 1);
+  assert.equal(recruiter.ai_shortlisted, 0);
+  assert.equal(recruiter.hr_selected, 0);
+  assert.equal(recruiter.interviews_completed, 0);
+  assert.equal(recruiter.hired, 0);
+  assert.equal(recruiter.rejected, 0);
+});
+
+test('a vacancy with zero applications still appears in by_vacancy, all zeros', () => {
+  const { by_vacancy } = buildRecruitmentReport({
+    vacancies: [{ id: 'v1', job_title: 'Untouched Role', department: 'Ops' }],
+  });
+  assert.equal(by_vacancy.length, 1);
+  assert.equal(by_vacancy[0].applications, 0);
+  assert.equal(by_vacancy[0].hired, 0);
+});
+
+test('an early rejection (never selected) does not count as hr_selected in the report either', () => {
+  const { totals } = buildRecruitmentReport({
+    applications: [{ id: 'a1', status: 'rejected', vacancy_id: 'v1' }],
+    vacancies: [{ id: 'v1', job_title: 'Role', department: 'Dept' }],
+  });
+  assert.equal(totals.hr_selected, 0);
 });

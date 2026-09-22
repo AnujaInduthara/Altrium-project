@@ -10,5 +10,6 @@ const router = express.Router();
 router.use(authenticateUser, requireRole('management', 'hr'));
 
 router.get('/pipeline', reportingController.getPipeline);
+router.get('/recruitment', reportingController.getRecruitmentReport);
 
 module.exports = router;

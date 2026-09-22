@@ -1,5 +1,5 @@
 const { supabaseAdmin } = require('../config/supabase');
-const { buildPipeline, toFunnelPercentages } = require('../utils/pipelineMetrics');
+const { buildPipeline, toFunnelPercentages, buildRecruitmentReport } = require('../utils/pipelineMetrics');
 
 class ReportingError extends Error {
   constructor(code, status, message) {
@@ -22,35 +22,40 @@ function emptyPipeline(vacancies, range) {
   return { range, funnel: toFunnelPercentages(pipeline.funnel), cards: pipeline.cards };
 }
 
+// Shared scoping rule for both report endpoints: 'management' sees every
+// vacancy; anyone else (in practice only 'hr', per the route's requireRole)
+// sees only vacancies they created. job_vacancies.created_by is an auth.users
+// id, not a profiles id, so the caller's authUserId (not profileId) is what
+// scopes it.
+async function loadScopedVacancies(columns, { from, to, vacancyId, requesterProfile }) {
+  let query = supabaseAdmin
+    .from('job_vacancies')
+    .select(columns)
+    .gte('created_at', `${from}T00:00:00.000Z`)
+    .lte('created_at', `${to}T23:59:59.999Z`);
+
+  if (requesterProfile.role !== 'management') {
+    query = query.eq('created_by', requesterProfile.authUserId);
+  }
+  if (vacancyId) {
+    query = query.eq('id', vacancyId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw wrapDbError('Failed to load vacancies', error);
+  return data || [];
+}
+
 // PB-23 — the recruitment pipeline funnel + summary cards, across a SMALL
 // FIXED NUMBER of batched queries (no per-vacancy loop): vacancies, then
 // applications/screenings/interviews/decisions/processes/stages each
 // `in (...)` once. Never selects applicant PII, CV fields or screening text
 // — only the ids and status columns the metrics need.
-//
-//   requesterProfile.role       : 'management' sees every vacancy;
-//                                 'hr' sees only vacancies they created.
-//   requesterProfile.authUserId : the caller's auth.users id (job_vacancies
-//                                 .created_by is an auth id, not a profile id).
 async function getPipeline({ from, to, vacancyId, requesterProfile }) {
   const range = { from, to };
 
-  let vacancyQuery = supabaseAdmin
-    .from('job_vacancies')
-    .select('id, status')
-    .gte('created_at', `${from}T00:00:00.000Z`)
-    .lte('created_at', `${to}T23:59:59.999Z`);
-
-  if (requesterProfile.role !== 'management') {
-    vacancyQuery = vacancyQuery.eq('created_by', requesterProfile.authUserId);
-  }
-  if (vacancyId) {
-    vacancyQuery = vacancyQuery.eq('id', vacancyId);
-  }
-
-  const { data: vacancies, error: vacancyError } = await vacancyQuery;
-  if (vacancyError) throw wrapDbError('Failed to load vacancies', vacancyError);
-  if (!vacancies || vacancies.length === 0) return emptyPipeline([], range);
+  const vacancies = await loadScopedVacancies('id, status', { from, to, vacancyId, requesterProfile });
+  if (vacancies.length === 0) return emptyPipeline([], range);
 
   const vacancyIds = vacancies.map((v) => v.id);
 
@@ -117,4 +122,55 @@ async function getPipeline({ from, to, vacancyId, requesterProfile }) {
   return { range, funnel: toFunnelPercentages(pipeline.funnel), cards: pipeline.cards };
 }
 
-module.exports = { getPipeline, ReportingError };
+// PB-24 — the recruitment report: period totals + a per-vacancy breakdown.
+// Same role scoping and batching approach as getPipeline; never selects
+// applicant PII, CV fields or screening text — only ids, status, job_title
+// and department.
+async function getRecruitmentReport({ from, to, vacancyId, requesterProfile }) {
+  const period = { from, to };
+
+  const vacancies = await loadScopedVacancies('id, job_title, department', {
+    from,
+    to,
+    vacancyId,
+    requesterProfile,
+  });
+  if (vacancies.length === 0) {
+    return { period, ...buildRecruitmentReport({ vacancies: [] }) };
+  }
+
+  const vacancyIds = vacancies.map((v) => v.id);
+
+  const { data: applicationsRaw, error: applicationsError } = await supabaseAdmin
+    .from('applications')
+    .select('id, status, vacancy_id')
+    .in('vacancy_id', vacancyIds);
+  if (applicationsError) throw wrapDbError('Failed to load applications', applicationsError);
+  if (!applicationsRaw || applicationsRaw.length === 0) {
+    return { period, ...buildRecruitmentReport({ vacancies }) };
+  }
+
+  const applicationIds = applicationsRaw.map((a) => a.id);
+
+  const [screeningsResult, interviewsResult, decisionsResult] = await Promise.all([
+    supabaseAdmin.from('application_screenings').select('application_id, status').in('application_id', applicationIds),
+    supabaseAdmin.from('interviews').select('application_id, status').in('application_id', applicationIds),
+    supabaseAdmin.from('hiring_decisions').select('application_id, decision').in('application_id', applicationIds),
+  ]);
+
+  if (screeningsResult.error) throw wrapDbError('Failed to load screenings', screeningsResult.error);
+  if (interviewsResult.error) throw wrapDbError('Failed to load interviews', interviewsResult.error);
+  if (decisionsResult.error) throw wrapDbError('Failed to load hiring decisions', decisionsResult.error);
+
+  const report = buildRecruitmentReport({
+    applications: applicationsRaw,
+    screenings: screeningsResult.data || [],
+    interviews: interviewsResult.data || [],
+    decisions: decisionsResult.data || [],
+    vacancies,
+  });
+
+  return { period, ...report };
+}
+
+module.exports = { getPipeline, getRecruitmentReport, ReportingError };

@@ -93,6 +93,43 @@
             <tbody id="reports-funnel-table-body"></tbody>
           </table>
         </div>
+
+        <div class="card reports-table-card">
+          <div class="card__header reports-table-card__head">
+            <div>
+              <h2 class="card__title">Recruitment Report</h2>
+              <p class="card__subtitle">Per-vacancy breakdown for the selected period.</p>
+            </div>
+            <button type="button" class="button button--ghost" id="reports-download-csv">
+              <span data-label>Download CSV</span>
+            </button>
+          </div>
+
+          <div class="reports-table-wrap">
+            <table class="reports-table">
+              <thead>
+                <tr>
+                  <th scope="col">Vacancy</th>
+                  <th scope="col">Department</th>
+                  <th scope="col">Applications</th>
+                  <th scope="col">AI Shortlisted</th>
+                  <th scope="col">HR Selected</th>
+                  <th scope="col">Interviews Completed</th>
+                  <th scope="col">Hired</th>
+                  <th scope="col">Rejected</th>
+                </tr>
+              </thead>
+              <tbody id="reports-table-body"></tbody>
+              <tfoot>
+                <tr id="reports-table-totals"></tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <p class="text-muted text-sm" id="reports-table-empty" hidden>
+            No vacancies fall within this period.
+          </p>
+        </div>
       </div>
     </section>
   </div>

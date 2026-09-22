@@ -94,6 +94,52 @@
   transition: width var(--transition-fast);
 }
 
+#reports-content > .card {
+  margin-bottom: var(--space-4);
+}
+
+/* Recruitment report table (PB-24) --------------------------------------- */
+
+.reports-table-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.reports-table-wrap {
+  overflow-x: auto;
+}
+
+.reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.reports-table th,
+.reports-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reports-table thead th {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-subtle);
+}
+
+.reports-table tfoot td {
+  font-weight: 700;
+  color: var(--color-text);
+  border-bottom: none;
+  border-top: 2px solid var(--color-border-strong);
+}
+
 @media (max-width: 480px) {
   .reports-toolbar {
     flex-direction: column;
