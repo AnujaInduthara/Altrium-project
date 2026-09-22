@@ -31,4 +31,11 @@ export const NAV_ITEMS = [
     icon: 'calendar',
     roles: ['employee', 'hr', 'hiring_manager'],
   },
+  {
+    id: 'hiring-dashboard',
+    label: 'Hiring Dashboard',
+    href: 'hiring-dashboard.html',
+    icon: 'chart',
+    roles: ['hiring_manager', 'management'],
+  },
 ];

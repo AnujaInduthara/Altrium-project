@@ -15,6 +15,7 @@ const availabilityRoutes = require('./routes/availability.routes');
 const schedulingRoutes = require('./routes/scheduling.routes');
 const interviewRoutes = require('./routes/interview.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const hiringRoutes = require('./routes/hiring.routes');
 const publicRoutes = require('./routes/public.routes');
 const { notFoundHandler, errorHandler } = require('./middleware/error.middleware');
 
@@ -47,6 +48,7 @@ app.use('/api/availability', availabilityRoutes);
 app.use('/api/interview-stages', schedulingRoutes);
 app.use('/api/interviews', interviewRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/hiring', hiringRoutes);
 app.use('/api/public', publicRoutes);
 
 app.use(notFoundHandler);

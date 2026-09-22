@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Candidate — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app" data-active-nav="hiring-dashboard">
+    <section class="page" id="candidate-page" hidden>
+      <a class="back-link" id="back-link" href="hiring-dashboard.html">&larr; Back to Hiring Dashboard</a>
+
+      <p class="status-message" id="candidate-loading" role="status">Loading candidate…</p>
+
+      <div class="alert" id="candidate-alert" role="alert" aria-live="assertive" hidden></div>
+
+      <div class="card" id="candidate-error" hidden>
+        <h1 class="heading-lg">This candidate could not be found.</h1>
+        <p class="text-muted">They may not have an interview process, or may not exist.</p>
+        <p><a class="button button--ghost" href="hiring-dashboard.html">Back to Hiring Dashboard</a></p>
+      </div>
+
+      <div id="candidate-content" hidden>
+        <header class="page-header review-header">
+          <div class="review-header__heading">
+            <div class="review-header__title-row">
+              <h1 class="page-header__title" id="candidate-name"></h1>
+              <span class="badge" id="candidate-decision"></span>
+            </div>
+            <p class="page-header__subtitle" id="candidate-subtitle"></p>
+          </div>
+
+          <div class="review-header__actions">
+            <button type="button" class="button button--primary" id="view-cv-btn">
+              <span data-label>View CV</span>
+            </button>
+            <button type="button" class="button button--ghost" id="download-cv-btn">
+              <span data-label>Download CV</span>
+            </button>
+          </div>
+        </header>
+
+        <div class="review-grid">
+          <div class="card">
+            <h2 class="review-section__title">Candidate</h2>
+            <dl class="review-info">
+              <div class="review-info__row"><dt>Email</dt><dd><a id="candidate-email-link"><span id="candidate-email"></span></a></dd></div>
+              <div class="review-info__row"><dt>Phone</dt><dd><a id="candidate-phone-link"><span id="candidate-phone"></span></a></dd></div>
+              <div class="review-info__row"><dt>Location</dt><dd id="candidate-location"></dd></div>
+            </dl>
+          </div>
+
+          <div class="card">
+            <h2 class="review-section__title">Vacancy</h2>
+            <dl class="review-info">
+              <div class="review-info__row"><dt>Position</dt><dd id="candidate-job-title"></dd></div>
+              <div class="review-info__row"><dt>Department</dt><dd id="candidate-department"></dd></div>
+            </dl>
+          </div>
+
+          <div class="card">
+            <h2 class="review-section__title">Progress</h2>
+            <dl class="review-info">
+              <div class="review-info__row"><dt>Stages</dt><dd id="candidate-progress"></dd></div>
+              <div class="review-info__row"><dt>Avg. rating</dt><dd id="candidate-avg-rating"></dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <div class="card" id="screening-summary-card">
+          <div class="review-score__head">
+            <h2 class="review-section__title">AI Screening Summary</h2>
+            <span class="badge" id="screening-status"></span>
+          </div>
+
+          <div id="screening-body" hidden>
+            <div class="review-score__figure">
+              <span class="review-score__value" id="screening-score"></span>
+              <span class="review-score__unit">/ 100</span>
+            </div>
+            <p class="review-score__rec" id="screening-rec"></p>
+
+            <dl class="review-info hiring-screening-match">
+              <div class="review-info__row"><dt>Experience match</dt><dd id="screening-exp"></dd></div>
+              <div class="review-info__row"><dt>Education match</dt><dd id="screening-edu"></dd></div>
+            </dl>
+
+            <div class="review-skills">
+              <div class="review-skills__group">
+                <h3 class="review-section__title">Matched Skills</h3>
+                <ul class="chip-list" id="screening-matched"></ul>
+              </div>
+              <div class="review-skills__group">
+                <h3 class="review-section__title">Missing Skills</h3>
+                <ul class="chip-list chip-list--muted" id="screening-missing"></ul>
+              </div>
+            </div>
+
+            <p class="review-summary" id="screening-summary-text"></p>
+          </div>
+
+          <p class="review-pending" id="screening-pending-note" hidden></p>
+        </div>
+
+        <!-- Step 5.2 (PB-21) fills this with the Hire/Reject decision panel. -->
+        <div class="card" id="decision-panel-placeholder">
+          <h2 class="review-section__title">Decision</h2>
+          <p class="text-muted text-sm">The hiring decision panel will appear here.</p>
+        </div>
+
+        <h2 class="review-section__title" id="stages-heading">Interview Stages</h2>
+        <div id="stage-cards"></div>
+      </div>
+    </section>
+  </div>
+
+  <template id="stage-card-template">
+    <div class="card hiring-stage-card">
+      <div class="hiring-stage-card__head">
+        <div>
+          <h3 class="review-section__title" data-stage-name></h3>
+          <p class="text-muted text-sm" data-stage-schedule></p>
+        </div>
+        <span class="badge" data-stage-status></span>
+      </div>
+      <p class="text-muted text-sm" data-no-evaluations hidden>No evaluations submitted yet.</p>
+      <div class="hiring-evaluation-list" data-evaluation-list></div>
+    </div>
+  </template>
+
+  <template id="evaluation-card-template">
+    <div class="hiring-evaluation">
+      <div class="hiring-evaluation__head">
+        <span class="hiring-evaluation__interviewer" data-interviewer></span>
+        <span class="hiring-evaluation__overall" data-overall></span>
+      </div>
+      <dl class="review-info hiring-evaluation__ratings">
+        <div class="review-info__row"><dt>Technical</dt><dd data-technical></dd></div>
+        <div class="review-info__row"><dt>Problem Solving</dt><dd data-problem-solving></dd></div>
+        <div class="review-info__row"><dt>Communication</dt><dd data-communication></dd></div>
+        <div class="review-info__row"><dt>Role Knowledge</dt><dd data-role-knowledge></dd></div>
+      </dl>
+      <p class="hiring-evaluation__comments" data-comments></p>
+    </div>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/hiringCandidatePage.js"></script>
+</body>
+</html>
