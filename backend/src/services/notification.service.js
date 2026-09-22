@@ -1,10 +1,13 @@
 const { supabaseAdmin } = require('../config/supabase');
 const transport = require('./notification.transport');
+const { getProfileByAuthUserId } = require('./auth.service');
 const {
   buildInterviewScheduledForCandidate,
   buildInterviewCancelledForCandidate,
   buildInterviewScheduledForInterviewer,
   buildInterviewCancelledForInterviewer,
+  buildDecisionForHr,
+  buildDecisionForCandidate,
 } = require('../utils/notificationTemplates');
 
 const FIELDS = ['id', 'type', 'title', 'body', 'payload', 'read_at', 'created_at'].join(', ');
@@ -122,6 +125,76 @@ async function notifyInterviewCancelled(interviewId) {
   });
 }
 
+// Everything the PB-22 templates need for one hiring decision, in a small
+// fixed number of queries. Deliberately minimal for the candidate side (see
+// notificationTemplates.js's header comment) — never selects an AI score,
+// rank, interviewer feedback, HR note, the decision's own reason text, or
+// any internal id, so there is nothing for buildDecisionForCandidate to leak
+// even by accident.
+async function loadHiringDecisionNotificationContext(applicationId) {
+  const { data: application, error: applicationError } = await supabaseAdmin
+    .from('applications')
+    .select('id, full_name, email, vacancy_id')
+    .eq('id', applicationId)
+    .maybeSingle();
+  if (applicationError || !application) {
+    if (applicationError) {
+      console.error('Failed to load application for decision notification:', applicationId, applicationError.message);
+    }
+    return null;
+  }
+
+  const [vacancyResult, decisionResult] = await Promise.all([
+    supabaseAdmin.from('job_vacancies').select('id, job_title, created_by').eq('id', application.vacancy_id).maybeSingle(),
+    supabaseAdmin
+      .from('hiring_decisions')
+      .select('decision, decided_at, profiles!hiring_manager_profile_id(full_name)')
+      .eq('application_id', applicationId)
+      .maybeSingle(),
+  ]);
+
+  if (vacancyResult.error || !vacancyResult.data) {
+    if (vacancyResult.error) {
+      console.error('Failed to load vacancy for decision notification:', applicationId, vacancyResult.error.message);
+    }
+    return null;
+  }
+  if (decisionResult.error || !decisionResult.data) {
+    if (decisionResult.error) {
+      console.error('Failed to load hiring decision for notification:', applicationId, decisionResult.error.message);
+    }
+    return null;
+  }
+
+  // The vacancy's owner is an auth.users id (job_vacancies.created_by); the
+  // notification's recipient_profile_id needs their profiles.id instead.
+  const hrProfile = await getProfileByAuthUserId(vacancyResult.data.created_by);
+
+  return {
+    candidateName: application.full_name || null,
+    candidateEmail: application.email || null,
+    vacancyTitle: vacancyResult.data.job_title || null,
+    decision: decisionResult.data.decision,
+    decidedAt: decisionResult.data.decided_at,
+    decidedByName: decisionResult.data.profiles?.full_name || null,
+    hrProfileId: hrProfile?.id || null,
+  };
+}
+
+// Called (via dispatchInBackground) after a successful hiring decision — one
+// notification for the vacancy's HR owner, one addressed to the candidate.
+async function notifyHiringDecision(applicationId) {
+  const ctx = await loadHiringDecisionNotificationContext(applicationId);
+  if (!ctx) return; // application/vacancy/decision vanished between deciding and dispatch
+
+  const notifications = [{ recipient_email: ctx.candidateEmail, ...buildDecisionForCandidate(ctx) }];
+  if (ctx.hrProfileId) {
+    notifications.push({ recipient_profile_id: ctx.hrProfileId, ...buildDecisionForHr(ctx) });
+  }
+
+  await createMany(notifications);
+}
+
 // The caller's own notifications, newest first.
 async function listForProfile(profileId, { unreadOnly = false, limit = 20 } = {}) {
   let query = supabaseAdmin
@@ -194,6 +267,7 @@ module.exports = {
   markRead,
   notifyInterviewScheduled,
   notifyInterviewCancelled,
+  notifyHiringDecision,
   dispatchInBackground,
   NotificationError,
 };

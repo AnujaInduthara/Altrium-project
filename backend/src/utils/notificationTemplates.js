@@ -13,6 +13,8 @@ const NOTIFICATION_TYPES = Object.freeze({
   INTERVIEW_SCHEDULED_INTERVIEWER: 'interview_scheduled_interviewer',
   INTERVIEW_CANCELLED_CANDIDATE: 'interview_cancelled_candidate',
   INTERVIEW_CANCELLED_INTERVIEWER: 'interview_cancelled_interviewer',
+  HIRING_DECISION_HR: 'hiring_decision_hr',
+  HIRING_DECISION_CANDIDATE: 'hiring_decision_candidate',
 });
 
 function formatDate(iso) {
@@ -98,10 +100,63 @@ function buildInterviewCancelledForInterviewer(ctx = {}) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// PB-22 — the final hiring decision.
+// ---------------------------------------------------------------------------
+
+// ctx: { candidateName, vacancyTitle, decision, decidedAt, decidedByName }.
+// HR already sees everything about their own vacancy's candidates elsewhere
+// (screening, interviewer feedback, ...), so this is not a privacy boundary
+// the way the candidate template below is — it may also carry who decided
+// and when.
+function buildDecisionForHr(ctx = {}) {
+  const hired = ctx.decision === 'hired';
+  return {
+    type: NOTIFICATION_TYPES.HIRING_DECISION_HR,
+    title: hired ? 'Candidate hired' : 'Candidate not selected',
+    body: hired
+      ? `${ctx.candidateName || 'The candidate'} has been selected for ${ctx.vacancyTitle || 'the role'}.`
+      : `${ctx.candidateName || 'The candidate'} was not selected for ${ctx.vacancyTitle || 'the role'}.`,
+    payload: {
+      candidate_name: ctx.candidateName || null,
+      job_title: ctx.vacancyTitle || null,
+      decision: ctx.decision || null,
+      decided_at: ctx.decidedAt || null,
+      decided_by_name: ctx.decidedByName || null,
+    },
+  };
+}
+
+// ctx additionally carries `decision` and (in production) never anything
+// else — see notification.service.js's context loader, which deliberately
+// never selects an AI score, rank, interviewer feedback, HR note, the
+// decision's own reason text, or any internal id. This builder is a HARD
+// privacy boundary regardless: it explicitly constructs the allowed output
+// from named `ctx` properties (vacancyTitle, decision) and reads nothing
+// else off `ctx`, so anything extra a caller accidentally attaches — even
+// the polluted context this file's test throws at it — is simply never read
+// and can never leak into the title, body or payload.
+function buildDecisionForCandidate(ctx = {}) {
+  const hired = ctx.decision === 'hired';
+  return {
+    type: NOTIFICATION_TYPES.HIRING_DECISION_CANDIDATE,
+    title: hired ? 'Congratulations!' : 'Thank you for your time',
+    body: hired
+      ? `Congratulations! You have been selected for the ${ctx.vacancyTitle || 'role'} position.`
+      : `Thank you for your interest in the ${ctx.vacancyTitle || 'role'} position. We have decided to move forward with another candidate.`,
+    payload: {
+      job_title: ctx.vacancyTitle || null,
+      decision: ctx.decision || null,
+    },
+  };
+}
+
 module.exports = {
   NOTIFICATION_TYPES,
   buildInterviewScheduledForCandidate,
   buildInterviewCancelledForCandidate,
   buildInterviewScheduledForInterviewer,
   buildInterviewCancelledForInterviewer,
+  buildDecisionForHr,
+  buildDecisionForCandidate,
 };

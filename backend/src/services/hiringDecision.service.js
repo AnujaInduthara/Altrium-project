@@ -1,5 +1,6 @@
 const { supabaseAdmin } = require('../config/supabase');
 const { canTransition } = require('../utils/applicationStatus');
+const notificationService = require('./notification.service');
 
 // A typed, HTTP-aware error the controller translates straight to a
 // response — mirrors the *Error classes in the other services. `details`
@@ -195,6 +196,11 @@ async function decide({ applicationId, profileId, authUserId, decision, reason, 
     .update({ status: 'completed' })
     .eq('id', process.id)
     .neq('status', 'cancelled');
+
+  // PB-22: notify the vacancy's HR owner + the candidate after the response
+  // would already be on its way — a notification failure must never turn
+  // this successful decision into an error.
+  notificationService.dispatchInBackground(() => notificationService.notifyHiringDecision(applicationId));
 
   return inserted;
 }
