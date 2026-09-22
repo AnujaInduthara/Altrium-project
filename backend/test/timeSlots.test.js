@@ -20,6 +20,27 @@ test('toMinutes rejects malformed input', () => {
   }
 });
 
+// Postgres `time` columns round-trip through PostgREST/supabase-js as
+// "HH:MM:SS" (e.g. interview_availability.start_time), not the "HH:MM" every
+// client form sends. Discovered end-to-end via backend/scripts/seed.js: a
+// stricter regex here silently zeroed every DB-sourced availability/booking
+// time, so buildFreeSlots() always reported zero free slots and scheduling
+// always failed with "interviewer unavailable" — never caught by unit tests
+// because they only ever used hand-written "HH:MM" fixtures.
+test('toMinutes also accepts the DB round-trip format HH:MM:SS', () => {
+  assert.equal(toMinutes('00:00:00'), 0);
+  assert.equal(toMinutes('09:05:00'), 545);
+  assert.equal(toMinutes('23:59:59'), 1439);
+});
+
+test('toMinutes also accepts fractional seconds', () => {
+  assert.equal(toMinutes('09:05:00.123456'), 545);
+});
+
+test('toMinutes still rejects an out-of-range seconds component', () => {
+  assert.equal(toMinutes('09:05:60'), null);
+});
+
 test('toTimeString formats minutes with zero-padding', () => {
   assert.equal(toTimeString(0), '00:00');
   assert.equal(toTimeString(545), '09:05');

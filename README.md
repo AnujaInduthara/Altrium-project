@@ -779,6 +779,44 @@ or use the VS Code "Live Server" extension. Then open
 See [`frontend/README.md`](frontend/README.md) for the full folder layout and
 conventions.
 
+### 4. Seed demo data (optional, development only)
+
+`backend/scripts/seed.js` fills a development database with a realistic
+end-to-end scenario using the same service-layer functions the API itself
+calls, so it stays valid however far the schema has been built out:
+
+- 1 HR user, 1 hiring manager, 1 management user, and 4 employees spanning
+  Engineering, Finance and Human Resources at junior/mid/senior/lead seniority.
+- 3 vacancies owned by the HR user: one draft, one published, one closed.
+- 6 applications against the published vacancy, each with a small generated
+  PDF CV uploaded to the private `candidate-cvs` bucket.
+- Availability slots for every employee across the next 14 days.
+- One full interview process for a selected candidate: 3 default stages, one
+  scheduled interview, and one submitted evaluation.
+
+Run it from `backend/`:
+
+```
+npm run seed -- --force
+```
+
+(or set `SEED_ALLOW=true` instead of passing `--force`). It refuses to run
+when `NODE_ENV=production`, and refuses without one of those two flags
+otherwise — this is a safety gate, not a suggestion, since it writes real rows
+and Supabase Auth users into whatever project `backend/.env` points at.
+
+Re-running it is safe: every person, vacancy and application is looked up by
+a stable `@altrium-seed.test` email or a `[Seed] …` title first and only
+created if missing, so it never duplicates data.
+
+**Demo login credentials** (development only — never use in a real
+deployment): every seeded account uses the password `Altrium-Seed-2026!`.
+Login emails follow the pattern `<role>@altrium-seed.test`, e.g.
+`hr@altrium-seed.test`, `hiring-manager@altrium-seed.test`,
+`management@altrium-seed.test`, `employee-1@altrium-seed.test`. The script
+prints the exact list (and the current employees' departments/seniority) at
+the end of each run.
+
 ### Runs on any laptop
 
 There is nothing machine-specific to change:

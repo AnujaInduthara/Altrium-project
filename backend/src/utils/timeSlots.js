@@ -5,12 +5,24 @@
 // { start, end } objects in minutes-since-midnight.
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+// The optional `:SS[.ffffff]` suffix is NOT for client input (the HTML time
+// input and every form on this site only ever sends "HH:MM") — it exists
+// because Postgres `time` columns round-trip through PostgREST/supabase-js as
+// "HH:MM:SS" (discovered end-to-end: interview_availability.start_time comes
+// back as e.g. "09:00:00", not "09:00"). Without it, every DB-sourced time
+// silently failed to parse, buildFreeSlots() in interviewerMatching.js always
+// computed zero free slots, and interview scheduling always reported every
+// interviewer as unavailable — this one line is why. toTimeString() always
+// re-normalises back to plain "HH:MM" before anything is persisted or
+// compared, so accepting seconds here is a pure input-parsing widening, not a
+// validation loosening.
+const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/;
 const TIME_STEP_MINUTES = 5;
 const MIN_DURATION_MINUTES = 15;
 const MAX_DURATION_MINUTES = 8 * 60;
 
-// 'HH:MM' -> minutes since midnight, or null if not a valid 24h time string.
+// 'HH:MM' (or the DB's 'HH:MM:SS') -> minutes since midnight, or null if not
+// a valid 24h time string.
 function toMinutes(hhmm) {
   if (typeof hhmm !== 'string') return null;
   const match = TIME_RE.exec(hhmm.trim());
