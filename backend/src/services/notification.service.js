@@ -8,6 +8,7 @@ const {
   buildInterviewCancelledForInterviewer,
   buildDecisionForHr,
   buildDecisionForCandidate,
+  buildCandidateSelected,
 } = require('../utils/notificationTemplates');
 
 const FIELDS = ['id', 'type', 'title', 'body', 'payload', 'read_at', 'created_at'].join(', ');
@@ -123,6 +124,51 @@ async function notifyInterviewCancelled(interviewId) {
     candidateBuilder: buildInterviewCancelledForCandidate,
     interviewerBuilder: buildInterviewCancelledForInterviewer,
   });
+}
+
+// Everything buildCandidateSelected needs, in one query plus one lookup —
+// deliberately minimal, same privacy boundary as loadHiringDecisionNotificationContext
+// below.
+async function loadCandidateSelectedNotificationContext(applicationId) {
+  const { data: application, error: applicationError } = await supabaseAdmin
+    .from('applications')
+    .select('id, full_name, email, vacancy_id')
+    .eq('id', applicationId)
+    .maybeSingle();
+  if (applicationError || !application) {
+    if (applicationError) {
+      console.error('Failed to load application for selection notification:', applicationId, applicationError.message);
+    }
+    return null;
+  }
+
+  const { data: vacancy, error: vacancyError } = await supabaseAdmin
+    .from('job_vacancies')
+    .select('job_title')
+    .eq('id', application.vacancy_id)
+    .maybeSingle();
+  if (vacancyError || !vacancy) {
+    if (vacancyError) {
+      console.error('Failed to load vacancy for selection notification:', applicationId, vacancyError.message);
+    }
+    return null;
+  }
+
+  return {
+    candidateName: application.full_name || null,
+    candidateEmail: application.email || null,
+    vacancyTitle: vacancy.job_title || null,
+  };
+}
+
+// Called (via dispatchInBackground) after a candidate is selected — a
+// heads-up email; notifyInterviewScheduled follows up with the actual
+// date/time once a slot is booked.
+async function notifyCandidateSelected(applicationId) {
+  const ctx = await loadCandidateSelectedNotificationContext(applicationId);
+  if (!ctx) return; // application/vacancy vanished between selecting and dispatch
+
+  await createMany([{ recipient_email: ctx.candidateEmail, ...buildCandidateSelected(ctx) }]);
 }
 
 // Everything the PB-22 templates need for one hiring decision, in a small
@@ -267,6 +313,7 @@ module.exports = {
   markRead,
   notifyInterviewScheduled,
   notifyInterviewCancelled,
+  notifyCandidateSelected,
   notifyHiringDecision,
   dispatchInBackground,
   NotificationError,

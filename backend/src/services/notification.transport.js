@@ -1,5 +1,6 @@
 const crypto = require('node:crypto');
 const { supabaseAdmin } = require('../config/supabase');
+const mailer = require('../config/mailer');
 
 // Short, non-reversible identifier for a log line — never the recipient
 // value itself.
@@ -14,12 +15,12 @@ function wrapDbError(message, error) {
   return err;
 }
 
-// The single seam every notification goes through. Today: persist the row
-// (always — it's what powers the in-app bell) and, for an email-addressed
-// recipient, log an intent line carrying no PII (never the title/body/
-// payload — just the type and a recipient hash, enough to trace delivery).
-// An email provider (SES, Postmark, SendGrid, ...) plugs in here later by
-// adding a real send call after the insert, without any call site changing.
+// The single seam every notification goes through. Always persists the row
+// first (it's what powers the in-app bell — the source of truth), then, for
+// an email-addressed recipient, sends the email via the SMTP transport
+// configured in config/mailer.js. A send failure is logged (with no PII —
+// just the type and a recipient hash) but never thrown: the in-app
+// notification already succeeded, and email here is best-effort on top of it.
 async function deliver(notification) {
   const { data, error } = await supabaseAdmin
     .from('notifications')
@@ -37,9 +38,25 @@ async function deliver(notification) {
   if (error) throw wrapDbError('Failed to persist notification', error);
 
   if (notification.recipient_email) {
-    console.log(
-      `[notification] would email "${notification.type}" to recipient ${hashRecipient(notification.recipient_email)}`
-    );
+    if (mailer.configured) {
+      try {
+        await mailer.transporter.sendMail({
+          from: mailer.fromAddress,
+          to: notification.recipient_email,
+          subject: notification.title,
+          text: notification.body,
+        });
+      } catch (sendError) {
+        console.error(
+          `[notification] failed to email "${notification.type}" to recipient ${hashRecipient(notification.recipient_email)}:`,
+          sendError.message
+        );
+      }
+    } else {
+      console.log(
+        `[notification] email not configured — would email "${notification.type}" to recipient ${hashRecipient(notification.recipient_email)}`
+      );
+    }
   }
 
   return data;
