@@ -15,6 +15,7 @@ const NOTIFICATION_TYPES = Object.freeze({
   INTERVIEW_CANCELLED_INTERVIEWER: 'interview_cancelled_interviewer',
   HIRING_DECISION_HR: 'hiring_decision_hr',
   HIRING_DECISION_CANDIDATE: 'hiring_decision_candidate',
+  CANDIDATE_SELECTED: 'candidate_selected',
 });
 
 function formatDate(iso) {
@@ -101,6 +102,25 @@ function buildInterviewCancelledForInterviewer(ctx = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Candidate selected for interview (application status -> 'selected'), sent
+// before any specific interview slot exists — buildInterviewScheduledForCandidate
+// above follows up with the date/time once one is booked.
+// ---------------------------------------------------------------------------
+
+// ctx: { vacancyTitle }. Same privacy boundary as the other candidate
+// templates: only the job title, nothing else.
+function buildCandidateSelected(ctx = {}) {
+  return {
+    type: NOTIFICATION_TYPES.CANDIDATE_SELECTED,
+    title: "You've been selected for an interview",
+    body: `Good news! You've been selected to move forward for the ${ctx.vacancyTitle || 'role'} position. We'll be in touch soon with interview details.`,
+    payload: {
+      job_title: ctx.vacancyTitle || null,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // PB-22 — the final hiring decision.
 // ---------------------------------------------------------------------------
 
@@ -157,6 +177,7 @@ module.exports = {
   buildInterviewCancelledForCandidate,
   buildInterviewScheduledForInterviewer,
   buildInterviewCancelledForInterviewer,
+  buildCandidateSelected,
   buildDecisionForHr,
   buildDecisionForCandidate,
 };

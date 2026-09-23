@@ -8,6 +8,7 @@ const {
 const { partitionSelection } = require('../utils/candidateSelection');
 const { validateStatusChange } = require('../utils/applicationStatus');
 const vacancyService = require('./vacancy.service');
+const notificationService = require('./notification.service');
 
 // A typed, HTTP-aware error the controller translates straight to a response
 // without leaking internals (mirrors VacancyError in vacancy.service.js).
@@ -331,6 +332,13 @@ async function selectCandidates({ vacancyId, applicationIds, hrUserId }) {
     newlySelected = data || [];
   }
 
+  // One heads-up email per newly-selected candidate — dispatched after the
+  // response is already on its way, so a notification failure can never turn
+  // this successful selection into an error (mirrors hiringDecision.service.js).
+  for (const application of newlySelected) {
+    notificationService.dispatchInBackground(() => notificationService.notifyCandidateSelected(application.id));
+  }
+
   // Every requested id is now 'selected' (either just transitioned, or already
   // was — the idempotent path). `newlySelectedCount` can be lower than
   // `eligible.length` only under a concurrent duplicate request, which is fine.
@@ -425,6 +433,10 @@ async function updateApplicationStatus({ applicationId, nextStatus, hrNote, auth
   if (error) throw wrapDbError('Failed to update application status', error);
   if (!data) {
     throw new ApplicationError('INVALID_STATUS_TRANSITION', 409, 'This status change is not allowed.');
+  }
+
+  if (value.next === APPLICATION_STATUS.SELECTED) {
+    notificationService.dispatchInBackground(() => notificationService.notifyCandidateSelected(data.id));
   }
 
   return data;
