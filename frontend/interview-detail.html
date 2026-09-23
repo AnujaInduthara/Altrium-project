@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interview Detail — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app" data-active-nav="my-interviews">
+    <section class="page" id="detail-page" hidden>
+      <a class="back-link" id="back-link" href="employee-dashboard.html">&larr; Back to My Interviews</a>
+
+      <p class="status-message" id="detail-loading" role="status">Loading interview…</p>
+
+      <div class="alert" id="detail-alert" role="alert" aria-live="assertive" hidden></div>
+
+      <div class="card" id="detail-error" hidden>
+        <h1 class="heading-lg">This interview could not be found.</h1>
+        <p class="text-muted">It may have been cancelled, or you may not be assigned to it.</p>
+        <p><a class="button button--ghost" href="employee-dashboard.html">Back to My Interviews</a></p>
+      </div>
+
+      <div id="detail-content" hidden>
+        <header class="page-header review-header">
+          <div class="review-header__heading">
+            <div class="review-header__title-row">
+              <h1 class="page-header__title" id="detail-candidate-name"></h1>
+              <span class="badge" id="detail-status"></span>
+            </div>
+            <p class="page-header__subtitle" id="detail-subtitle"></p>
+          </div>
+
+          <div class="review-header__actions">
+            <button type="button" class="button button--primary" id="view-cv-btn">
+              <span data-label>View CV</span>
+            </button>
+            <button type="button" class="button button--ghost" id="download-cv-btn">
+              <span data-label>Download CV</span>
+            </button>
+          </div>
+        </header>
+
+        <div class="review-grid">
+          <div class="card">
+            <h2 class="review-section__title">Schedule</h2>
+            <dl class="review-info">
+              <div class="review-info__row">
+                <dt>Date</dt>
+                <dd id="detail-date"></dd>
+              </div>
+              <div class="review-info__row">
+                <dt>Time</dt>
+                <dd id="detail-time"></dd>
+              </div>
+              <div class="review-info__row">
+                <dt>Stage</dt>
+                <dd id="detail-stage"></dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="card">
+            <h2 class="review-section__title">Candidate</h2>
+            <dl class="review-info">
+              <div class="review-info__row">
+                <dt>Name</dt>
+                <dd id="detail-candidate-name-row"></dd>
+              </div>
+              <div class="review-info__row">
+                <dt>Email</dt>
+                <dd><a id="detail-email-link"><span id="detail-email"></span></a></dd>
+              </div>
+              <div class="review-info__row">
+                <dt>Phone</dt>
+                <dd><a id="detail-phone-link"><span id="detail-phone"></span></a></dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="card">
+            <h2 class="review-section__title">Vacancy</h2>
+            <dl class="review-info">
+              <div class="review-info__row">
+                <dt>Position</dt>
+                <dd id="detail-job-title"></dd>
+              </div>
+              <div class="review-info__row">
+                <dt>Department</dt>
+                <dd id="detail-department"></dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+
+        <div class="card" id="detail-description-card">
+          <h2 class="review-section__title">What the Role Needs</h2>
+          <p class="review-summary" id="detail-description"></p>
+          <ul class="chip-list" id="detail-requirements"></ul>
+        </div>
+
+        <div class="card" id="evaluation-card">
+          <h2 class="review-section__title">Your Evaluation</h2>
+
+          <p class="review-disclaimer" id="evaluation-not-started-note" hidden>
+            The evaluation form appears here once this interview's scheduled time has passed.
+          </p>
+
+          <form id="evaluation-form" novalidate hidden>
+            <div class="evaluation-ratings">
+              <div class="field field--plain" data-field="technical_rating">
+                <span class="field__label" id="technical_rating-label">Technical</span>
+                <div class="rating-control" role="radiogroup" aria-labelledby="technical_rating-label">
+                  <label class="rating-control__option"><input type="radio" name="technical_rating" value="1" class="rating-control__input" /><span class="rating-control__value">1</span></label>
+                  <label class="rating-control__option"><input type="radio" name="technical_rating" value="2" class="rating-control__input" /><span class="rating-control__value">2</span></label>
+                  <label class="rating-control__option"><input type="radio" name="technical_rating" value="3" class="rating-control__input" /><span class="rating-control__value">3</span></label>
+                  <label class="rating-control__option"><input type="radio" name="technical_rating" value="4" class="rating-control__input" /><span class="rating-control__value">4</span></label>
+                  <label class="rating-control__option"><input type="radio" name="technical_rating" value="5" class="rating-control__input" /><span class="rating-control__value">5</span></label>
+                </div>
+                <p class="field__error" id="technical_rating-error" role="alert"></p>
+              </div>
+
+              <div class="field field--plain" data-field="problem_solving_rating">
+                <span class="field__label" id="problem_solving_rating-label">Problem Solving</span>
+                <div class="rating-control" role="radiogroup" aria-labelledby="problem_solving_rating-label">
+                  <label class="rating-control__option"><input type="radio" name="problem_solving_rating" value="1" class="rating-control__input" /><span class="rating-control__value">1</span></label>
+                  <label class="rating-control__option"><input type="radio" name="problem_solving_rating" value="2" class="rating-control__input" /><span class="rating-control__value">2</span></label>
+                  <label class="rating-control__option"><input type="radio" name="problem_solving_rating" value="3" class="rating-control__input" /><span class="rating-control__value">3</span></label>
+                  <label class="rating-control__option"><input type="radio" name="problem_solving_rating" value="4" class="rating-control__input" /><span class="rating-control__value">4</span></label>
+                  <label class="rating-control__option"><input type="radio" name="problem_solving_rating" value="5" class="rating-control__input" /><span class="rating-control__value">5</span></label>
+                </div>
+                <p class="field__error" id="problem_solving_rating-error" role="alert"></p>
+              </div>
+
+              <div class="field field--plain" data-field="communication_rating">
+                <span class="field__label" id="communication_rating-label">Communication</span>
+                <div class="rating-control" role="radiogroup" aria-labelledby="communication_rating-label">
+                  <label class="rating-control__option"><input type="radio" name="communication_rating" value="1" class="rating-control__input" /><span class="rating-control__value">1</span></label>
+                  <label class="rating-control__option"><input type="radio" name="communication_rating" value="2" class="rating-control__input" /><span class="rating-control__value">2</span></label>
+                  <label class="rating-control__option"><input type="radio" name="communication_rating" value="3" class="rating-control__input" /><span class="rating-control__value">3</span></label>
+                  <label class="rating-control__option"><input type="radio" name="communication_rating" value="4" class="rating-control__input" /><span class="rating-control__value">4</span></label>
+                  <label class="rating-control__option"><input type="radio" name="communication_rating" value="5" class="rating-control__input" /><span class="rating-control__value">5</span></label>
+                </div>
+                <p class="field__error" id="communication_rating-error" role="alert"></p>
+              </div>
+
+              <div class="field field--plain" data-field="role_knowledge_rating">
+                <span class="field__label" id="role_knowledge_rating-label">Role Knowledge</span>
+                <div class="rating-control" role="radiogroup" aria-labelledby="role_knowledge_rating-label">
+                  <label class="rating-control__option"><input type="radio" name="role_knowledge_rating" value="1" class="rating-control__input" /><span class="rating-control__value">1</span></label>
+                  <label class="rating-control__option"><input type="radio" name="role_knowledge_rating" value="2" class="rating-control__input" /><span class="rating-control__value">2</span></label>
+                  <label class="rating-control__option"><input type="radio" name="role_knowledge_rating" value="3" class="rating-control__input" /><span class="rating-control__value">3</span></label>
+                  <label class="rating-control__option"><input type="radio" name="role_knowledge_rating" value="4" class="rating-control__input" /><span class="rating-control__value">4</span></label>
+                  <label class="rating-control__option"><input type="radio" name="role_knowledge_rating" value="5" class="rating-control__input" /><span class="rating-control__value">5</span></label>
+                </div>
+                <p class="field__error" id="role_knowledge_rating-error" role="alert"></p>
+              </div>
+            </div>
+
+            <div class="field field--plain" data-field="comments">
+              <label class="field__label" for="evaluation-comments">Comments (optional)</label>
+              <div class="field__control">
+                <textarea
+                  class="field__input"
+                  id="evaluation-comments"
+                  maxlength="4000"
+                  rows="4"
+                  placeholder="Notes for the hiring manager"
+                ></textarea>
+              </div>
+              <p class="field__hint"><span id="evaluation-comments-count">0</span> / 4000</p>
+              <p class="field__error" id="comments-error" role="alert"></p>
+            </div>
+
+            <div class="review-decision__actions">
+              <button type="submit" class="button button--primary" id="submit-evaluation-btn">
+                <span data-label>Submit Evaluation</span>
+              </button>
+            </div>
+          </form>
+
+          <div id="evaluation-summary" hidden>
+            <p class="text-muted text-sm">Your evaluation has been submitted and can no longer be changed.</p>
+            <dl class="review-info">
+              <div class="review-info__row"><dt>Technical</dt><dd id="summary-technical_rating"></dd></div>
+              <div class="review-info__row"><dt>Problem Solving</dt><dd id="summary-problem_solving_rating"></dd></div>
+              <div class="review-info__row"><dt>Communication</dt><dd id="summary-communication_rating"></dd></div>
+              <div class="review-info__row"><dt>Role Knowledge</dt><dd id="summary-role_knowledge_rating"></dd></div>
+              <div class="review-info__row"><dt>Overall</dt><dd id="summary-overall_rating"></dd></div>
+              <div class="review-info__row"><dt>Comments</dt><dd id="summary-comments"></dd></div>
+              <div class="review-info__row"><dt>Submitted</dt><dd id="summary-submitted_at"></dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Submit confirmation -->
+  <div class="modal" id="submit-evaluation-modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="submit-evaluation-modal-title">
+      <h2 class="modal__title" id="submit-evaluation-modal-title">Submit this evaluation?</h2>
+      <p class="modal__body">You won't be able to change your ratings or comments after submitting.</p>
+      <div class="modal__actions">
+        <button type="button" class="button button--ghost" data-close>Cancel</button>
+        <button type="button" class="button button--primary" id="confirm-submit-evaluation-btn" data-autofocus>
+          <span data-label>Submit Evaluation</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/interviewDetailPage.js"></script>
+</body>
+</html>

@@ -280,13 +280,44 @@ async function getPublicVacancyByToken(token) {
   return publicView;
 }
 
-// Public, unauthenticated lookup used by the PB-03 application submission. It
-// only ever resolves a PUBLISHED vacancy — a CLOSED (PB-08), draft or unknown
-// token returns null, so a closed vacancy stops accepting new applications at
-// the server even though its link stays resolvable. Returns the internal `id`
-// and `job_title` for the backend's own use (linking the application row,
-// wording the confirmation) — this shape is never sent to the applicant's
-// browser.
+// Public, unauthenticated listing for the Applicant Portal. Only ever returns
+// PUBLISHED vacancies and only PUBLIC_FIELDS plus public_token (the portal
+// needs it to link to the apply form) — never id, created_by or timestamps.
+async function listPublishedVacancies({ q, department, limit, offset }) {
+  let query = supabaseAdmin
+    .from('job_vacancies')
+    .select([...PUBLIC_FIELDS, 'public_token'].join(', '), { count: 'exact' })
+    .eq('status', VACANCY_STATUS.PUBLISHED)
+    .order('published_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (department) {
+    query = query.eq('department', department);
+  }
+  if (q) {
+    // PostgREST's or() grammar splits on top-level commas/parens, which a
+    // search term can legitimately contain (e.g. "Engineer, Backend").
+    // Double-quoting the value makes it literal; backslash/quote inside it
+    // must then be escaped for that quoting layer (separate from the LIKE
+    // backslash-escaping already applied to % and _ in q).
+    const likeValue = `%${q}%`.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    query = query.or(`job_title.ilike."${likeValue}",department.ilike."${likeValue}"`);
+  }
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    throw wrapDbError('Failed to list published vacancies', error);
+  }
+
+  return { vacancies: data || [], total: count || 0 };
+}
+
+// Public, unauthenticated lookup used by the PB-03 application submission. Like
+// getPublicVacancyByToken it only ever resolves a PUBLISHED vacancy, but it
+// returns the internal `id` and `job_title` for the backend's own use (linking
+// the application row, wording the confirmation) — this shape is never sent to
+// the applicant's browser. Returns null for draft / closed / unknown tokens.
 async function getApplicableVacancyByToken(token) {
   if (!token || typeof token !== 'string') return null;
 
@@ -331,6 +362,7 @@ module.exports = {
   getVacancyForUser,
   publishVacancy,
   closeVacancy,
+  listPublishedVacancies,
   getPublicVacancyByToken,
   getApplicableVacancyByToken,
   getVacancyForScreening,

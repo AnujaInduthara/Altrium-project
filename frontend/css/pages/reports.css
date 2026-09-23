@@ -1,0 +1,152 @@
+/* ============================================================================
+   Reports page (PB-23) — the recruitment pipeline funnel + summary cards.
+   No charting library: bars are CSS-width divs driven by percentages, and
+   every figure is also present as text (plus a visually-hidden table
+   equivalent for screen readers). Reuses card / field / button / empty-state.
+   ========================================================================== */
+
+.reports-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-5);
+  margin-bottom: var(--space-4);
+}
+
+.reports-toolbar__field {
+  min-width: 0;
+  flex: 1 1 10rem;
+}
+
+.reports-toolbar__apply {
+  flex-shrink: 0;
+}
+
+.reports-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.reports-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.reports-card__label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-subtle);
+}
+
+.reports-card__value {
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.reports-funnel {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reports-funnel__row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.reports-funnel__row-label {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.reports-funnel__row-count {
+  font-weight: 700;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.reports-funnel__bar-track {
+  height: 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  overflow: hidden;
+}
+
+.reports-funnel__bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: var(--color-primary);
+  transition: width var(--transition-fast);
+}
+
+#reports-content > .card {
+  margin-bottom: var(--space-4);
+}
+
+/* Recruitment report table (PB-24) --------------------------------------- */
+
+.reports-table-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.reports-table-wrap {
+  overflow-x: auto;
+}
+
+.reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.reports-table th,
+.reports-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reports-table thead th {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-subtle);
+}
+
+.reports-table tfoot td {
+  font-weight: 700;
+  color: var(--color-text);
+  border-bottom: none;
+  border-top: 2px solid var(--color-border-strong);
+}
+
+@media (max-width: 480px) {
+  .reports-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reports-toolbar__apply {
+    width: 100%;
+  }
+}

@@ -6,6 +6,8 @@ const {
   CV_BUCKET,
 } = require('../config/applicationOptions');
 const { partitionSelection } = require('../utils/candidateSelection');
+const { validateStatusChange } = require('../utils/applicationStatus');
+const vacancyService = require('./vacancy.service');
 
 // A typed, HTTP-aware error the controller translates straight to a response
 // without leaking internals (mirrors VacancyError in vacancy.service.js).
@@ -172,6 +174,8 @@ const APPLICATION_HR_FIELDS = [
   'created_at',
   'selected_at',
   'selected_by',
+  'status_updated_at',
+  'hr_note',
 ].join(', ');
 
 // All applications for one vacancy, newest first. The caller (controller) must
@@ -303,16 +307,24 @@ async function selectCandidates({ vacancyId, applicationIds, hrUserId }) {
 
   let newlySelected = [];
   if (eligible.length > 0) {
+    const now = new Date().toISOString();
+    // eligible ids can come from 'submitted' (the original one-step shortcut)
+    // or 'shortlisted' (reached via the PB-07 status panel) — canTransition()
+    // in applicationStatus.js is the single definition of which statuses may
+    // become 'selected'. The .in('status', …) guard re-checks that at write
+    // time so a concurrent change (e.g. a reject) can't be silently overridden.
     const { data, error } = await supabaseAdmin
       .from('applications')
       .update({
         status: APPLICATION_STATUS.SELECTED,
-        selected_at: new Date().toISOString(),
+        selected_at: now,
         selected_by: hrUserId,
+        status_updated_at: now,
+        status_updated_by: hrUserId,
       })
       .in('id', eligible)
       .eq('vacancy_id', vacancyId)
-      .eq('status', APPLICATION_STATUS.SUBMITTED)
+      .in('status', [APPLICATION_STATUS.SUBMITTED, APPLICATION_STATUS.SHORTLISTED])
       .select('id');
 
     if (error) throw wrapDbError('Failed to select candidates', error);
@@ -329,6 +341,95 @@ async function selectCandidates({ vacancyId, applicationIds, hrUserId }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// PB-07 — single-application status transitions (Applicant Review decision
+// panel). Shares its transition rules with selectCandidates() above via
+// canTransition() in applicationStatus.js.
+// ---------------------------------------------------------------------------
+
+// current -> next, with an optional internal hr_note, on the application the
+// caller (an HR user) owns via its parent vacancy. Never called for the AI
+// screening pipeline — screening is advisory and never writes status.
+async function updateApplicationStatus({ applicationId, nextStatus, hrNote, authUserId }) {
+  // 'hired' is only ever set by the Hiring Manager's audited decision
+  // (hiringDecision.service.js), which inserts a hiring_decisions row in the
+  // same operation. Refusing it here — even though applicationStatus.js's
+  // ALLOWED_TRANSITIONS now permits selected -> hired for that other path —
+  // keeps this ordinary HR endpoint from ever producing a 'hired' application
+  // with no decision record behind it.
+  if (nextStatus === APPLICATION_STATUS.HIRED) {
+    throw new ApplicationError(
+      'INVALID_STATUS_TRANSITION',
+      409,
+      'Hiring decisions are made from the Hiring Dashboard, not here.'
+    );
+  }
+
+  const application = await getApplicationById(applicationId);
+  if (!application) {
+    throw new ApplicationError('APPLICATION_NOT_FOUND', 404, 'This application could not be found.');
+  }
+
+  try {
+    const vacancy = await vacancyService.getVacancyForUser(application.vacancy_id, authUserId);
+    if (!vacancy) {
+      throw new ApplicationError('APPLICATION_NOT_FOUND', 404, 'This application could not be found.');
+    }
+  } catch (err) {
+    if (err && err.isVacancyError && err.code === 'FORBIDDEN') {
+      // Someone else's vacancy — report as not-found so nothing leaks.
+      throw new ApplicationError('APPLICATION_NOT_FOUND', 404, 'This application could not be found.');
+    }
+    throw err;
+  }
+
+  const { valid, errors, value } = validateStatusChange({
+    current: application.status,
+    next: nextStatus,
+    hr_note: hrNote,
+  });
+
+  if (!valid) {
+    if (errors.status || errors.hr_note) {
+      throw new ApplicationError('VALIDATION_ERROR', 400, errors.status || errors.hr_note);
+    }
+    // errors.transition: a known status that isn't legal from the current one.
+    throw new ApplicationError('INVALID_STATUS_TRANSITION', 409, 'This status change is not allowed.');
+  }
+
+  const now = new Date().toISOString();
+  const update = {
+    status: value.next,
+    status_updated_at: now,
+    status_updated_by: authUserId,
+    hr_note: value.hr_note || null,
+  };
+  // The applications_selected_audit constraint (migration 006) requires
+  // selected_at/selected_by whenever status = 'selected'. No legal transition
+  // ever leaves 'selected' (it's terminal), so they never need clearing here.
+  if (value.next === APPLICATION_STATUS.SELECTED) {
+    update.selected_at = now;
+    update.selected_by = authUserId;
+  }
+
+  // Conditional update guarded by the status read above: atomic, and turns a
+  // concurrent status change into an accurate 409 rather than clobbering it.
+  const { data, error } = await supabaseAdmin
+    .from('applications')
+    .update(update)
+    .eq('id', applicationId)
+    .eq('status', application.status)
+    .select(APPLICATION_HR_FIELDS)
+    .maybeSingle();
+
+  if (error) throw wrapDbError('Failed to update application status', error);
+  if (!data) {
+    throw new ApplicationError('INVALID_STATUS_TRANSITION', 409, 'This status change is not allowed.');
+  }
+
+  return data;
+}
+
 module.exports = {
   createApplication,
   listApplicationsForVacancy,
@@ -336,6 +437,7 @@ module.exports = {
   getApplicationForScreening,
   listApplicationStatusesForVacancy,
   selectCandidates,
+  updateApplicationStatus,
   downloadCv,
   createCvSignedUrl,
   ApplicationError,

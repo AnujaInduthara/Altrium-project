@@ -16,6 +16,19 @@ export async function fetchPublicVacancy(token) {
   return toResult(response);
 }
 
+// params: { q, department, limit, offset } — empty/undefined values are
+// omitted from the query string rather than sent as empty params.
+export async function fetchPublicVacancies(params = {}) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue;
+    search.set(key, String(value));
+  }
+  const qs = search.toString();
+  const response = await fetch(`${publicBase}${qs ? `?${qs}` : ''}`);
+  return toResult(response);
+}
+
 // formData: a FormData with full_name, email, phone, location and the `cv` file.
 // The browser sets the multipart Content-Type (and boundary) itself.
 export async function submitApplication(token, formData) {

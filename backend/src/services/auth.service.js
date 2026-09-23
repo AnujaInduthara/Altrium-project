@@ -15,7 +15,9 @@ async function verifyAccessToken(token) {
 async function getProfileByAuthUserId(authUserId) {
   const { data, error } = await supabaseAdmin
     .from('profiles')
-    .select('id, auth_user_id, email, role')
+    .select(
+      'id, auth_user_id, email, role, full_name, department, job_position, seniority_level, is_active'
+    )
     .eq('auth_user_id', authUserId)
     .single();
 

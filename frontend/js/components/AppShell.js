@@ -16,11 +16,17 @@
 
 import { NAV_ITEMS } from '../config/navigation.js';
 import { svgIcon } from './icons.js';
+import { mountNotificationBell } from './NotificationBell.js';
 
 const LOGO_SRC = 'assets/icons/altrium-logo.png';
 
-function navMarkup(activeId) {
-  return NAV_ITEMS.map((item) => {
+// `role` filters NAV_ITEMS to those with no `roles` list, or whose `roles`
+// list includes it. `role` is undefined at mount time (auth hasn't resolved
+// yet) — showing everything until setUser({ role }) re-filters keeps every
+// existing page's sidebar exactly as it always rendered.
+function navMarkup(activeId, role) {
+  const items = role ? NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(role)) : NAV_ITEMS;
+  return items.map((item) => {
     const isActive = item.id === activeId;
     return `
       <a class="sidebar__item${isActive ? ' is-active' : ''}" href="${item.href}"${
@@ -44,10 +50,24 @@ function shellMarkup(activeId) {
       </a>
 
       <div class="app-header__actions">
-        <button class="icon-button" type="button" aria-label="Notifications">
-          ${svgIcon('bell')}
-          <span class="icon-button__dot" aria-hidden="true"></span>
-        </button>
+        <div class="notification-menu" data-notification-menu>
+          <button
+            class="icon-button"
+            type="button"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-label="Notifications"
+            data-notification-trigger
+          >
+            ${svgIcon('bell')}
+            <span class="icon-button__dot" aria-hidden="true" data-notification-dot hidden></span>
+          </button>
+          <div class="notification-menu__dropdown" role="menu" aria-label="Notifications" hidden data-notification-dropdown>
+            <div class="notification-menu__header">Notifications</div>
+            <ul class="notification-menu__list" data-notification-list></ul>
+            <p class="notification-menu__empty" data-notification-empty hidden>No notifications yet.</p>
+          </div>
+        </div>
 
         <div class="user-menu" data-user-menu>
           <button class="user-badge" type="button" aria-haspopup="true" aria-expanded="false">
@@ -100,6 +120,7 @@ export function mountAppShell(root, options = {}) {
   const userMenu = root.querySelector('[data-user-menu]');
   const userTrigger = userMenu.querySelector('.user-badge');
   const dropdown = userMenu.querySelector('.user-menu__dropdown');
+  const notificationBell = mountNotificationBell(root);
 
   /* --- mobile sidebar ---------------------------------------------------- */
   function setSidebar(open) {
@@ -144,9 +165,23 @@ export function mountAppShell(root, options = {}) {
     main: root.querySelector('.app-shell__main'),
     content: root.querySelector('[data-shell-content]'),
 
-    setUser({ name, email } = {}) {
+    // `role` is optional — pass the signed-in profile's role once auth
+    // resolves to filter the sidebar to what that role can see (see
+    // navigation.js). Omit it and the sidebar stays exactly as first
+    // rendered (today's behaviour, unchanged, for every page that doesn't
+    // pass it).
+    setUser({ name, email, role } = {}) {
       if (name) root.querySelector('[data-user-name]').textContent = name;
-      if (email) root.querySelector('[data-user-email]').textContent = email;
+      if (email) {
+        root.querySelector('[data-user-email]').textContent = email;
+        // setUser() is every page's "auth just resolved" signal — this is
+        // the first safe point to fetch notifications (before this, we
+        // don't yet know there's a valid session).
+        notificationBell.load();
+      }
+      if (role) {
+        root.querySelector('.sidebar__nav').innerHTML = navMarkup(activeId, role);
+      }
     },
   };
 }

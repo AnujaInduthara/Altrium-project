@@ -79,6 +79,20 @@ export const ApplicationService = {
     return toResult(response);
   },
 
+  // PB-07: move one application through the HR status lifecycle (Applicant
+  // Review's decision panel). payload: { status, hr_note? }.
+  async updateStatus(applicationId, payload) {
+    const response = await fetch(
+      `${apiBase}/applications/${encodeURIComponent(applicationId)}/status`,
+      {
+        method: 'PATCH',
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      }
+    );
+    return toResult(response);
+  },
+
   // PB-07: HR selects applicants to proceed as candidates. `applicationIds` is
   // an array of application ids that must all belong to `vacancyId`. The server
   // authenticates the HR user, checks vacancy ownership, verifies every id, and

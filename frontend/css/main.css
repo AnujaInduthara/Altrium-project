@@ -20,6 +20,7 @@
 @import "components/app-header.css";
 @import "components/sidebar.css";
 @import "components/user-menu.css";
+@import "components/notification-menu.css";
 @import "components/page-header.css";
 @import "components/modal.css";
 
@@ -38,3 +39,11 @@
 @import "pages/applicant-review.css";
 @import "pages/candidates.css";
 @import "pages/apply.css";
+@import "pages/portal.css";
+@import "pages/interview-setup.css";
+@import "pages/my-availability.css";
+@import "pages/interviews.css";
+@import "pages/interview-detail.css";
+@import "pages/hiring-dashboard.css";
+@import "pages/hiring-candidate.css";
+@import "pages/reports.css";

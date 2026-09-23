@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hiring Dashboard — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app" data-active-nav="hiring-dashboard">
+    <section class="page" id="hiring-page" hidden>
+      <header class="page-header">
+        <h1 class="page-header__title">Hiring Dashboard</h1>
+        <p class="page-header__subtitle">
+          Compare candidates across the AI screening score and every completed interview stage.
+        </p>
+      </header>
+
+      <div class="alert" id="hiring-alert" role="alert" aria-live="assertive" hidden></div>
+
+      <div class="card hiring-toolbar">
+        <div class="field field--plain field--select hiring-toolbar__field" data-field="vacancy">
+          <label class="field__label" for="hiring-vacancy-filter">Vacancy</label>
+          <div class="field__control">
+            <select class="field__input" id="hiring-vacancy-filter">
+              <option value="">All vacancies</option>
+            </select>
+            <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+
+        <div class="field field--plain field--select hiring-toolbar__field hiring-toolbar__field--sm" data-field="status">
+          <label class="field__label" for="hiring-status-filter">Decision</label>
+          <div class="field__control">
+            <select class="field__input" id="hiring-status-filter">
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="hired">Hired</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <svg class="field__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <p class="status-message" id="hiring-loading" role="status">Loading candidates…</p>
+
+      <div class="card empty-state" id="hiring-empty" hidden>
+        <h2 class="heading-lg">No candidates yet</h2>
+        <p class="text-muted">
+          Candidates appear here once an interview process has been started for them.
+        </p>
+      </div>
+
+      <div class="card" id="hiring-error" hidden>
+        <h1 class="heading-lg">Unable to load candidates</h1>
+        <p class="text-muted" id="hiring-error-message">Please check your connection and try again.</p>
+        <p>
+          <button type="button" class="button button--primary" id="hiring-retry">Try again</button>
+        </p>
+      </div>
+
+      <ul class="hiring-candidate-list" id="hiring-candidate-list" hidden></ul>
+    </section>
+  </div>
+
+  <template id="hiring-candidate-template">
+    <li class="card hiring-candidate">
+      <a class="hiring-candidate__link" data-link>
+        <div class="hiring-candidate__head">
+          <div>
+            <h2 class="hiring-candidate__name" data-name></h2>
+            <p class="hiring-candidate__meta" data-meta></p>
+          </div>
+          <span class="badge" data-decision></span>
+        </div>
+
+        <div class="hiring-candidate__scores">
+          <div class="hiring-score" data-ai-score-wrap>
+            <span class="hiring-score__label">AI Score</span>
+            <span class="hiring-score__value" data-ai-score></span>
+          </div>
+          <div class="hiring-score">
+            <span class="hiring-score__label">Avg. Interview Rating</span>
+            <span class="hiring-score__value" data-avg-rating></span>
+          </div>
+          <div class="hiring-score">
+            <span class="hiring-score__label">Progress</span>
+            <span class="hiring-score__value" data-progress></span>
+          </div>
+        </div>
+
+        <ul class="hiring-stage-strip" data-stage-strip></ul>
+      </a>
+    </li>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/hiringDashboardPage.js"></script>
+</body>
+</html>

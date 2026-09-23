@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Availability — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app" data-active-nav="my-availability">
+    <section class="page" id="availability-page" hidden>
+      <header class="page-header">
+        <h1 class="page-header__title">My Availability</h1>
+        <p class="page-header__subtitle">
+          Publish the times you're free to interview. HR sees these slots when
+          scheduling interviews for candidates — you never need to message them.
+        </p>
+      </header>
+
+      <div class="alert" id="availability-alert" role="alert" aria-live="assertive" hidden></div>
+
+      <section class="card availability-form-card">
+        <div class="card__header">
+          <h2 class="card__title">Add availability</h2>
+        </div>
+        <form id="availability-form" class="availability-form" novalidate>
+          <div class="availability-form__grid">
+            <div class="field field--plain" data-field="slot_date">
+              <label class="field__label" for="slot_date">Date</label>
+              <div class="field__control">
+                <input class="field__input" type="date" id="slot_date" name="slot_date" required />
+              </div>
+              <p class="field__error" id="slot_date-error" role="alert"></p>
+            </div>
+
+            <div class="field field--plain" data-field="start_time">
+              <label class="field__label" for="start_time">Start time</label>
+              <div class="field__control">
+                <input class="field__input" type="time" id="start_time" name="start_time" step="300" required />
+              </div>
+              <p class="field__error" id="start_time-error" role="alert"></p>
+            </div>
+
+            <div class="field field--plain" data-field="end_time">
+              <label class="field__label" for="end_time">End time</label>
+              <div class="field__control">
+                <input class="field__input" type="time" id="end_time" name="end_time" step="300" required />
+              </div>
+              <p class="field__error" id="end_time-error" role="alert"></p>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="button button--primary" id="add-slot-btn">
+              <span data-label>Add Availability</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <p class="status-message" id="availability-loading" role="status">Loading your availability…</p>
+
+      <div class="card empty-state" id="availability-empty" hidden>
+        <h2 class="heading-lg">No availability published yet</h2>
+        <p class="text-muted">Add a time above so HR can schedule interviews with you.</p>
+      </div>
+
+      <div class="card" id="availability-error" hidden>
+        <h1 class="heading-lg">Unable to load your availability</h1>
+        <p class="text-muted" id="availability-error-message">
+          Please check your connection and try again.
+        </p>
+        <p>
+          <button type="button" class="button button--primary" id="availability-retry">
+            Try again
+          </button>
+        </p>
+      </div>
+
+      <div id="availability-groups"></div>
+    </section>
+  </div>
+
+  <!-- Remove confirmation -->
+  <div class="modal" id="remove-slot-modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="remove-slot-modal-title">
+      <h2 class="modal__title" id="remove-slot-modal-title">Remove this availability?</h2>
+      <p class="modal__body" id="remove-slot-modal-body"></p>
+      <div class="modal__actions">
+        <button type="button" class="button button--ghost" data-close>Cancel</button>
+        <button type="button" class="button button--danger" id="confirm-remove-slot-btn" data-autofocus>
+          <span data-label>Remove</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/myAvailabilityPage.js"></script>
+</body>
+</html>

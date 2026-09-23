@@ -1,15 +1,22 @@
 const { successResponse, errorResponse } = require('../utils/response');
 const vacancyService = require('../services/vacancy.service');
 const applicationService = require('../services/application.service');
+const interviewService = require('../services/interview.service');
 const screeningService = require('../services/screening/screeningService');
 const { toScreeningView } = require('./screening.controller');
 const { normalizeApplicationIds } = require('../utils/candidateSelection');
+const { toVacancyErrorResponse } = require('../utils/vacancyOwnershipError');
 
 // A VacancyError (FORBIDDEN when the vacancy belongs to another HR user, etc.)
-// translates straight to a response; anything else is an unexpected failure.
+// translates to a response (FORBIDDEN becomes 404 — see
+// toVacancyErrorResponse); anything else is an unexpected failure. This is
+// the fallback for any handler below that doesn't already have its own
+// explicit FORBIDDEN -> 404 translation before reaching here (e.g.
+// listVacancyApplications).
 function handleError(res, err, label) {
   if (err && err.isVacancyError) {
-    return errorResponse(res, err.status, err.code, err.message);
+    const { status, code, message } = toVacancyErrorResponse(err);
+    return errorResponse(res, status, code, message);
   }
   console.error(`${label} failed:`, err.message);
   return errorResponse(res, 500, 'INTERNAL_ERROR', 'Something went wrong. Please try again.');
@@ -53,10 +60,23 @@ async function listVacancyApplications(req, res) {
   }
 }
 
-// GET /api/applications/:id/cv — HR only. Returns a short-lived signed URL for
-// the applicant's CV, but only to the HR user who owns the vacancy. An
-// application owned by someone else is reported as "not found" so nothing about
-// its existence leaks.
+// HR owns the vacancy behind this application, OR (PB-18) the caller is an
+// assigned, non-cancelled interviewer somewhere in this application's
+// interview process. Either grants CV access; neither means "not found".
+async function canAccessApplicationCv(application, authUserId, profileId) {
+  try {
+    const vacancy = await vacancyService.getVacancyForUser(application.vacancy_id, authUserId);
+    if (vacancy) return true;
+  } catch (err) {
+    if (!(err && err.isVacancyError && err.code === 'FORBIDDEN')) throw err;
+  }
+  return interviewService.isAssignedInterviewer({ applicationId: application.id, profileId });
+}
+
+// GET /api/applications/:id/cv — HR (owner-checked) or an assigned
+// interviewer (PB-18). Returns a short-lived signed URL for the applicant's
+// CV. An application the caller has no access to is reported as "not found"
+// so nothing about its existence leaks.
 async function getApplicationCv(req, res) {
   try {
     const application = await applicationService.getApplicationById(req.params.id);
@@ -64,16 +84,8 @@ async function getApplicationCv(req, res) {
       return errorResponse(res, 404, 'APPLICATION_NOT_FOUND', 'This application could not be found.');
     }
 
-    let vacancy;
-    try {
-      vacancy = await vacancyService.getVacancyForUser(application.vacancy_id, req.user.id);
-    } catch (err) {
-      if (err && err.isVacancyError && err.code === 'FORBIDDEN') {
-        return errorResponse(res, 404, 'APPLICATION_NOT_FOUND', 'This application could not be found.');
-      }
-      throw err;
-    }
-    if (!vacancy) {
+    const authorized = await canAccessApplicationCv(application, req.user.id, req.profile.id);
+    if (!authorized) {
       return errorResponse(res, 404, 'APPLICATION_NOT_FOUND', 'This application could not be found.');
     }
 
@@ -226,9 +238,32 @@ async function selectCandidates(req, res) {
   }
 }
 
+// PATCH /api/applications/:id/status — HR only, owner-checked. Body:
+// { status, hr_note? }. Moves the application through the PB-07 status
+// lifecycle (see backend/src/utils/applicationStatus.js). The AI screening
+// pipeline never calls this — it is an explicit, authenticated HR decision.
+async function updateApplicationStatus(req, res) {
+  try {
+    const { status, hr_note } = req.body || {};
+    const application = await applicationService.updateApplicationStatus({
+      applicationId: req.params.id,
+      nextStatus: status,
+      hrNote: hr_note,
+      authUserId: req.user.id,
+    });
+    return successResponse(res, application);
+  } catch (err) {
+    if (err && err.isApplicationError) {
+      return errorResponse(res, err.status, err.code, err.message);
+    }
+    return handleError(res, err, 'updateApplicationStatus');
+  }
+}
+
 module.exports = {
   listVacancyApplications,
   getApplicationCv,
   getApplicationReview,
   selectCandidates,
+  updateApplicationStatus,
 };

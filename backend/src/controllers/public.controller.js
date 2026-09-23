@@ -1,10 +1,41 @@
 const { successResponse, errorResponse } = require('../utils/response');
 const vacancyService = require('../services/vacancy.service');
 const applicationService = require('../services/application.service');
+const { parseVacancyListQuery } = require('../utils/vacancyListQuery');
 const {
   validateApplicationInput,
   validateCvFile,
 } = require('../utils/applicationValidation');
+
+// GET /api/public/vacancies
+// Unauthenticated. Lists currently published vacancies for the Applicant
+// Portal, filtered/paginated by query params.
+async function listPublishedVacancies(req, res) {
+  try {
+    const { valid, errors, value } = parseVacancyListQuery(req.query);
+    if (!valid) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Please check the query parameters and try again.',
+          fields: errors,
+        },
+      });
+    }
+
+    const { vacancies, total } = await vacancyService.listPublishedVacancies(value);
+    return successResponse(res, {
+      vacancies,
+      total,
+      limit: value.limit,
+      offset: value.offset,
+    });
+  } catch (err) {
+    console.error('listPublishedVacancies failed:', err.message);
+    return errorResponse(res, 500, 'INTERNAL_ERROR', 'Something went wrong. Please try again.');
+  }
+}
 
 // GET /api/public/vacancies/:token
 // Unauthenticated. Resolves the vacancy behind a public token and returns only
@@ -105,4 +136,4 @@ async function submitApplication(req, res) {
   }
 }
 
-module.exports = { getPublishedVacancy, submitApplication };
+module.exports = { listPublishedVacancies, getPublishedVacancy, submitApplication };

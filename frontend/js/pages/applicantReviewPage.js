@@ -1,17 +1,42 @@
-// Applicant Review page controller (PB-06). Mounts the app shell, enforces the
-// HR-only route, and shows one applicant's details alongside the AI screening
-// result that PB-05 already stored for them.
+// Applicant Review page controller (PB-06 + PB-07). Mounts the app shell,
+// enforces the HR-only route, and shows one applicant's details alongside the
+// AI screening result that PB-05 already stored for them.
 //
-// This page is READ-ONLY. It never changes the application, its status, or the
-// screening result — opening it does not re-run AI screening. Candidate
-// selection (PB-07) is deliberately not here: the AI provides a recommendation
-// only, and the final decision stays with HR.
+// The AI screening section is READ-ONLY — opening this page never re-runs
+// screening or changes its result. The Selection Decision panel is the one
+// place that changes the application's own status: it never changes or
+// re-runs AI screening, and never touches the CV. The AI provides a
+// recommendation only; the decision stays with HR.
 
 import { AuthService } from '../services/authService.js';
 import { ApplicationService } from '../services/applicationService.js';
 import { mountAppShell } from '../components/AppShell.js';
 import { createAlert } from '../components/Alert.js';
+import { createModal } from '../components/Modal.js';
 import { readParam, withHashParam } from '../utils/urlParams.js';
+
+// Mirrors backend/src/utils/applicationStatus.js ALLOWED_TRANSITIONS. Kept in
+// sync by hand — the backend is the enforced source of truth; this only
+// decides which buttons to show.
+const ALLOWED_TRANSITIONS = {
+  submitted: ['under_review', 'shortlisted', 'rejected', 'selected'],
+  under_review: ['shortlisted', 'rejected'],
+  shortlisted: ['selected', 'rejected'],
+  rejected: ['under_review'],
+  selected: [],
+};
+
+const ACTION_LABELS = {
+  under_review: 'Mark Under Review',
+  shortlisted: 'Shortlist',
+  selected: 'Select for Interview',
+  rejected: 'Reject',
+};
+
+function actionLabel(currentStatus, targetStatus) {
+  if (targetStatus === 'under_review' && currentStatus === 'rejected') return 'Re-open';
+  return ACTION_LABELS[targetStatus] || targetStatus;
+}
 
 const LOGIN_PAGE = 'login.html';
 
@@ -21,6 +46,16 @@ const APPLICATION_STATUS_LABELS = {
   shortlisted: 'Shortlisted',
   rejected: 'Rejected',
   selected: 'Selected',
+};
+
+// Mirrors the badge scheme already used on the AI Screening list
+// (aiScreeningPage.js APP_STATUS) so the two pages agree visually.
+const STATUS_BADGE_CLASSES = {
+  submitted: 'badge--neutral',
+  under_review: 'badge--warning',
+  shortlisted: 'badge--success',
+  selected: 'badge--success',
+  rejected: 'badge--danger',
 };
 
 // PB-05 screening lifecycle — NOT a hiring outcome.
@@ -80,9 +115,13 @@ const loadingEl = $('review-loading');
 const errorEl = $('review-error');
 const detailEl = $('review-detail');
 const alert = createAlert($('review-alert'));
+const rejectModal = createModal($('reject-modal'));
 
 const applicationId = readParam('id');
 const vacancyParam = readParam('vacancy');
+
+let currentStatus = 'submitted';
+let decisionSubmitting = false;
 
 // --- helpers -------------------------------------------------------------
 
@@ -155,9 +194,14 @@ function render({ application, vacancy, screening }) {
   text('review-subtitle', subtitleParts.join(' · '));
 
   const statusKey = String(application.status || 'submitted').toLowerCase();
+  currentStatus = statusKey;
   const statusEl = $('review-status');
   statusEl.textContent = APPLICATION_STATUS_LABELS[statusKey] || application.status || 'Submitted';
-  statusEl.classList.toggle('badge--published', statusKey === 'submitted');
+  statusEl.classList.remove('badge--neutral', 'badge--warning', 'badge--success', 'badge--danger');
+  statusEl.classList.add(STATUS_BADGE_CLASSES[statusKey] || 'badge--neutral');
+
+  $('hr-note').value = application.hr_note || '';
+  renderDecisionActions(statusKey);
 
   // --- applicant information
   text('review-email', application.email);
@@ -233,6 +277,110 @@ function render({ application, vacancy, screening }) {
   loadingEl.hidden = true;
   errorEl.hidden = true;
   detailEl.hidden = false;
+}
+
+// --- selection decision (PB-07) ---------------------------------------
+
+function messageForStatusChange(status, body) {
+  const apiMessage = body?.error?.message;
+  switch (status) {
+    case 400:
+      return apiMessage || 'Please check the internal note and try again.';
+    case 404:
+      return apiMessage || 'This applicant could not be found.';
+    case 409:
+      return apiMessage || 'This status change is no longer allowed. The page will refresh.';
+    default:
+      return apiMessage || 'Unable to update this applicant. Please try again.';
+  }
+}
+
+async function submitStatusChange(targetStatus) {
+  if (decisionSubmitting) return;
+  decisionSubmitting = true;
+  renderDecisionActions(currentStatus); // disables the action buttons while in flight
+  alert.hide();
+
+  try {
+    const { ok, status, body } = await ApplicationService.updateStatus(applicationId, {
+      status: targetStatus,
+      hr_note: $('hr-note').value,
+    });
+
+    if (status === 401) {
+      await AuthService.signOut();
+      window.location.replace(LOGIN_PAGE);
+      return;
+    }
+
+    if (ok && body?.data) {
+      const statusKey = String(body.data.status || targetStatus).toLowerCase();
+      currentStatus = statusKey;
+      const statusEl = $('review-status');
+      statusEl.textContent = APPLICATION_STATUS_LABELS[statusKey] || body.data.status;
+      statusEl.classList.remove('badge--neutral', 'badge--warning', 'badge--success', 'badge--danger');
+      statusEl.classList.add(STATUS_BADGE_CLASSES[statusKey] || 'badge--neutral');
+      $('hr-note').value = body.data.hr_note || '';
+      alert.success(`Status updated to “${APPLICATION_STATUS_LABELS[statusKey] || statusKey}”.`);
+      renderDecisionActions(statusKey);
+      return;
+    }
+
+    alert.error(messageForStatusChange(status, body));
+    if (status === 404 || status === 409) {
+      await load();
+    } else {
+      renderDecisionActions(currentStatus);
+    }
+  } catch (err) {
+    alert.error('Unable to update this applicant. Please check your connection and try again.');
+    renderDecisionActions(currentStatus);
+  } finally {
+    decisionSubmitting = false;
+  }
+}
+
+function openRejectModal() {
+  $('reject-modal-body').textContent =
+    'This applicant will be marked as rejected. You can re-open them to "Under review" later if needed.';
+  rejectModal.open();
+}
+
+function renderDecisionActions(statusKey) {
+  const actionsEl = $('review-decision-actions');
+  const terminalEl = $('review-decision-terminal');
+  const targets = ALLOWED_TRANSITIONS[statusKey] || [];
+
+  actionsEl.replaceChildren(
+    ...targets.map((target) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className =
+        target === 'rejected' ? 'button button--danger' : 'button button--primary';
+      button.textContent = actionLabel(statusKey, target);
+      button.disabled = decisionSubmitting;
+      button.addEventListener('click', () => {
+        if (target === 'rejected') {
+          openRejectModal();
+        } else {
+          submitStatusChange(target);
+        }
+      });
+      return button;
+    })
+  );
+
+  terminalEl.hidden = targets.length > 0;
+
+  // PB-09 entry point: once a candidate is selected, HR sets up their
+  // interview process from here.
+  const setupLink = $('setup-interviews-link');
+  setupLink.hidden = statusKey !== 'selected';
+  if (statusKey === 'selected') {
+    setupLink.href = vacancyParam
+      ? `interview-setup.html#id=${encodeURIComponent(applicationId)}&vacancy=${encodeURIComponent(vacancyParam)}`
+      : withHashParam('interview-setup.html', 'id', applicationId);
+  }
 }
 
 // --- CV access --------------------------------------------------------
@@ -338,5 +486,9 @@ async function load() {
 
 $('view-cv-btn').addEventListener('click', (e) => openCv(e.currentTarget, { download: false }));
 $('download-cv-btn').addEventListener('click', (e) => openCv(e.currentTarget, { download: true }));
+$('confirm-reject-btn').addEventListener('click', () => {
+  rejectModal.close();
+  submitStatusChange('rejected');
+});
 
 document.addEventListener('DOMContentLoaded', load);

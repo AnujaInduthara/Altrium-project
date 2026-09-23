@@ -66,6 +66,39 @@
           applicant remains with HR.
         </p>
 
+        <section class="card review-decision" id="review-decision-card">
+          <div class="card__header">
+            <h2 class="card__title">Selection Decision</h2>
+            <p class="card__subtitle">
+              Move this applicant through the recruitment process. This is the
+              HR decision — AI screening never sets it.
+            </p>
+          </div>
+
+          <div class="field field--plain" data-field="hr_note">
+            <label class="field__label" for="hr-note">Internal note (optional)</label>
+            <div class="field__control">
+              <textarea
+                class="field__input"
+                id="hr-note"
+                maxlength="1000"
+                rows="2"
+                placeholder="Visible to HR only, never shown to the applicant"
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="review-decision__actions" id="review-decision-actions"></div>
+
+          <p class="text-muted text-sm" id="review-decision-terminal" hidden>
+            This applicant's status is final for this stage of the process.
+          </p>
+
+          <a class="button button--primary" id="setup-interviews-link" href="interview-setup.html" hidden>
+            Set up interviews
+          </a>
+        </section>
+
         <div class="card review-score" id="review-score-card">
           <div class="review-score__head">
             <h2 class="review-section__title">AI Screening Score</h2>
@@ -166,6 +199,21 @@
         </p>
       </div>
     </section>
+  </div>
+
+  <!-- Reject confirmation (PB-07) -->
+  <div class="modal" id="reject-modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="reject-modal-title">
+      <h2 class="modal__title" id="reject-modal-title">Reject this applicant?</h2>
+      <p class="modal__body" id="reject-modal-body"></p>
+      <div class="modal__actions">
+        <button type="button" class="button button--ghost" data-close>Cancel</button>
+        <button type="button" class="button button--danger" id="confirm-reject-btn" data-autofocus>
+          <span data-label>Reject Applicant</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>

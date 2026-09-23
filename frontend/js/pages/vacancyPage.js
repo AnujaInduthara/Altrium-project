@@ -84,25 +84,6 @@ function render(vacancy) {
   const isPublished = currentStatus === 'published';
   const isClosed = currentStatus === 'closed';
 
-  // Page heading reflects where the vacancy is in its lifecycle.
-  text(
-    'detail-page-title',
-    isPublished ? 'Job Vacancy' : isClosed ? 'Closed Job Vacancy' : 'Publish Job Vacancy'
-  );
-  text(
-    'detail-page-subtitle',
-    isPublished
-      ? 'This vacancy is live. Share the public application link or close it when hiring is done.'
-      : isClosed
-        ? 'This vacancy is closed. Recruitment data is preserved and remains accessible below.'
-        : 'Review and publish the vacancy to generate a public application link.'
-  );
-
-  // The Draft ↔ Published switch is only meaningful before closing. Once closed,
-  // it is replaced by a plain "Closed" status badge.
-  $('status-toggle-row').hidden = isClosed;
-  $('status-closed-badge').hidden = !isClosed;
-
   // The switch shows the live state and is only interactive on a draft. The
   // "Update to Published" button stays disabled until the user flips it on.
   setToggle(isPublished);
@@ -110,27 +91,10 @@ function render(vacancy) {
   $('publish-btn').hidden = !isDraft;
   $('publish-btn').disabled = true;
 
-  // Close Vacancy is only offered for a published vacancy; never for a draft
-  // (nothing to close) or an already-closed one. Button visibility is a UX aid
-  // only — the backend independently rejects any invalid transition.
-  $('close-btn').hidden = !isPublished;
-  $('close-btn').disabled = closing;
-
-  // Deep links to the recruitment data stay available while published AND after
-  // closing, so historical applications / screening / candidates remain reachable.
-  const hasRecruitmentData = isPublished || isClosed;
-  $('published-links').hidden = !hasRecruitmentData;
+  $('published-links').hidden = !isPublished;
   $('closed-note').hidden = !isClosed;
   $('copy-btn').disabled = !isPublished;
-  // The copyable public link only makes sense while the vacancy is live; a
-  // closed vacancy's link resolves to a "closed" notice, not the form.
-  $('public-link-field').hidden = isClosed;
-
-  if (hasRecruitmentData) {
-    $('view-applications-link').href = withHashParam('applications.html', 'vacancy', vacancy.id);
-    $('view-screening-link').href = withHashParam('ai-screening.html', 'vacancy', vacancy.id);
-    $('select-candidates-link').href = withHashParam('candidates.html', 'vacancy', vacancy.id);
-  }
+  $('close-btn').hidden = !isPublished;
 
   if (isPublished) {
     $('public-url').value = vacancy.public_url || '';
@@ -138,6 +102,8 @@ function render(vacancy) {
       'published-at-hint',
       vacancy.published_at ? `Published ${formatDateTime(vacancy.published_at)}` : ''
     );
+    $('view-applications-link').href = withHashParam('applications.html', 'vacancy', vacancy.id);
+    $('view-screening-link').href = withHashParam('ai-screening.html', 'vacancy', vacancy.id);
     text('publish-panel-subtitle', 'This vacancy is live. Candidates can apply using the link below.');
   } else {
     $('public-url').value = '';

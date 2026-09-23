@@ -1,0 +1,157 @@
+/* ============================================================================
+   Hiring Candidate detail page (PB-20) — full detail for one candidate in the
+   Hiring Manager's pipeline. Reuses the .review-* / .card / .chip-list
+   classes from applicant-review.css; only the stage/evaluation cards and the
+   screening match spacing are page-local.
+   ========================================================================== */
+
+#candidate-content > .card,
+#candidate-content > #stages-heading {
+  margin-bottom: var(--space-4);
+}
+
+.hiring-screening-match {
+  margin-top: var(--space-3);
+}
+
+/* Hiring decision panel (PB-21) -------------------------------------------- */
+
+#decision-decided {
+  margin-bottom: var(--space-4);
+}
+
+.decision-choice-field {
+  margin-bottom: var(--space-4);
+}
+
+.decision-choice {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.decision-choice__option {
+  position: relative;
+  flex: 1 1 10rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.decision-choice__option:hover {
+  border-color: var(--color-primary);
+}
+
+.decision-choice__input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.decision-choice__option--hire:has(.decision-choice__input:checked) {
+  border-color: var(--color-success);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.decision-choice__option--reject:has(.decision-choice__input:checked) {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.field.is-invalid .decision-choice__option {
+  border-color: var(--color-danger);
+}
+
+.hiring-acknowledge {
+  padding: var(--space-4);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+  margin-bottom: var(--space-4);
+}
+
+.hiring-outstanding-list {
+  margin: var(--space-2) 0 var(--space-3);
+  padding-left: 1.25rem;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.hiring-acknowledge__label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hiring-stage-card {
+  margin-bottom: var(--space-4);
+}
+
+.hiring-stage-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.hiring-evaluation-list {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.hiring-evaluation {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.hiring-evaluation__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.hiring-evaluation__interviewer {
+  font-weight: 700;
+}
+
+.hiring-evaluation__overall {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.hiring-evaluation__ratings {
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.hiring-evaluation__ratings .review-info__row {
+  grid-template-columns: 8rem 1fr;
+}
+
+.hiring-evaluation__comments {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+  margin: 0;
+}

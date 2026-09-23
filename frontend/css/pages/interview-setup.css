@@ -1,0 +1,279 @@
+/* ============================================================================
+   Interview Setup page (PB-09..PB-12) — choose a level, then add/remove/
+   reorder/configure the candidate's interview stage list.
+   Reuses card / button / field / badge / page-header; only the level chooser
+   and stage-row layout live here.
+   ========================================================================== */
+
+/* Level chooser ----------------------------------------------------------- */
+
+.level-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.level-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.level-option:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.level-option:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.level-option input {
+  accent-color: var(--color-primary);
+}
+
+/* Stage list ---------------------------------------------------------------- */
+
+.stage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.stage-row {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.stage-row--locked {
+  background: var(--color-surface-muted);
+}
+
+.stage-row__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.stage-row__index {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.stage-row--locked .stage-row__index {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+}
+
+.stage-row__name {
+  flex: 1;
+  min-width: 0;
+}
+
+.stage-row__controls {
+  flex-shrink: 0;
+  display: flex;
+  gap: var(--space-1);
+}
+
+.stage-row__locked-note {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.stage-row__fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.stage-row__field .field__label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.stage-list__add {
+  margin-top: var(--space-4);
+}
+
+/* "Find interviewers" panel (PB-14, Step 3.2) ----------------------------- */
+
+.stage-row__interviewers {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.interviewers-panel {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.interviewers-panel__range {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.interviewers-panel__field {
+  flex: 1;
+  min-width: 9rem;
+}
+
+.interviewers-panel__empty {
+  padding: var(--space-3);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-md);
+}
+
+.interviewer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.interviewer-card {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.interviewer-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.interviewer-card__name {
+  font-weight: 700;
+}
+
+.interviewer-card__meta {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.interviewer-card__slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.interviewer-card__slots li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.interviewer-card__slot-btn {
+  padding: 0.2rem 0.6rem;
+  font-size: var(--text-xs);
+}
+
+/* Scheduled-stage interview details + cancel action ------------------------ */
+
+.stage-row--locked .button {
+  margin-top: var(--space-2);
+}
+
+/* Save bar ------------------------------------------------------------------ */
+
+.save-bar {
+  position: sticky;
+  bottom: var(--space-4);
+  margin-top: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.save-bar__status {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.save-bar__status--dirty {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.save-bar__actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+/* Responsive ------------------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .stage-row__fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .stage-row__header {
+    flex-wrap: wrap;
+  }
+
+  .stage-row__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .save-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .save-bar__actions {
+    justify-content: flex-end;
+  }
+
+  .interviewers-panel__range {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
