@@ -40,8 +40,7 @@ async function deliver(notification) {
   if (notification.recipient_email) {
     if (mailer.configured) {
       try {
-        await mailer.transporter.sendMail({
-          from: mailer.fromAddress,
+        await mailer.send({
           to: notification.recipient_email,
           subject: notification.title,
           text: notification.body,
