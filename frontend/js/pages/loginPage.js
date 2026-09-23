@@ -19,26 +19,12 @@ const ROLE_HOME_PAGES = {
   management: 'reports.html',
 };
 
-// Already signed in? Skip the form and go straight to this role's home page.
-// Role-aware (not a flat redirect to dashboard.html) so a non-HR session
-// doesn't bounce here -> dashboard.html -> requireSession failure -> here.
-async function redirectIfSignedIn() {
-  const session = await AuthService.getSession();
-  if (!session) return;
-
-  const { ok, body } = await AuthService.fetchProfile(session.access_token);
-  if (ok) {
-    window.location.replace(ROLE_HOME_PAGES[body.data.role] || DEFAULT_HOME_PAGE);
-    return;
-  }
-  // Session exists but the profile is gone/inactive — clear it quietly so the
-  // form below works instead of looping. No error shown; nothing was submitted.
-  await AuthService.signOut();
-}
-
+// A visit to login.html is always an explicit request to sign in — it never
+// auto-redirects an existing session away. (The "already signed in -> go
+// straight to your dashboard" behavior lives in entryPage.js/index.html,
+// the actual session-aware entry point.) This lets you land here to sign in
+// as a different account without having to sign out first.
 function initLoginPage() {
-  redirectIfSignedIn();
-
   const form = document.getElementById('login-form');
   const email = createTextField(document.querySelector('[data-field="email"]'));
   const password = createPasswordField(document.querySelector('[data-field="password"]'));
