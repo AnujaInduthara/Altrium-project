@@ -1,0 +1,52 @@
+/* ============================================================================
+   My Interviews (candidate) — a lightweight header (logo + sign-out) over a
+   plain content column. Not AppShell: a candidate has exactly one page and
+   no multi-section nav.
+   ========================================================================== */
+
+.candidate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.candidate-main {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+.candidate-page__heading {
+  margin-bottom: var(--space-6);
+}
+
+.candidate-page__state {
+  text-align: center;
+}
+
+.interview-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  list-style: none;
+}
+
+.interview-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.interview-card__title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.interview-card__meta {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

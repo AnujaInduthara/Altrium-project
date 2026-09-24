@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>My Interviews — Altrium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <header class="candidate-header">
+    <a class="brand" href="my-interviews.html">
+      <img class="brand__logo" src="assets/icons/altrium-logo.png" alt="Altrium" />
+    </a>
+    <button type="button" class="button button--ghost" id="sign-out-btn">Sign out</button>
+  </header>
+
+  <main class="candidate-main">
+    <div class="candidate-page__heading">
+      <h1 class="heading-lg">My Interviews</h1>
+      <p class="text-muted">Your scheduled interviews with Altrium.</p>
+    </div>
+
+    <p class="status-message" id="interviews-loading" role="status">Loading your interviews…</p>
+
+    <div class="card candidate-page__state" id="interviews-error" hidden>
+      <h2 class="heading-lg">Something went wrong</h2>
+      <p class="text-muted">
+        We couldn't load your interviews right now. Please check your connection and try again.
+      </p>
+      <p>
+        <button type="button" class="button button--primary" id="interviews-retry">Try again</button>
+      </p>
+    </div>
+
+    <div class="card candidate-page__state" id="interviews-empty" hidden role="status">
+      <h2 class="heading-lg">No interviews scheduled yet</h2>
+      <p class="text-muted">
+        You don't have any interviews scheduled yet. We'll email you as soon as one is booked.
+      </p>
+    </div>
+
+    <ul class="interview-card-list" id="interviews-list" hidden></ul>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script type="module" src="js/pages/myInterviewsPage.js"></script>
+</body>
+</html>

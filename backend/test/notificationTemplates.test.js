@@ -8,6 +8,7 @@ const {
   buildInterviewCancelledForInterviewer,
   buildDecisionForHr,
   buildDecisionForCandidate,
+  buildCandidateAccountInvite,
 } = require('../src/utils/notificationTemplates');
 
 const BASE_CTX = {
@@ -262,4 +263,53 @@ test('an empty decision context never throws and produces sensible fallbacks', (
     assert.ok(body);
     assert.ok(payload && typeof payload === 'object');
   }
+});
+
+// ---------------------------------------------------------------------------
+// Candidate account invite.
+// ---------------------------------------------------------------------------
+
+const INVITE_BASE_CTX = {
+  vacancyTitle: 'Senior Backend Engineer',
+  setPasswordUrl: 'https://example.com/candidate-set-password.html#access_token=SECRET_TOKEN',
+};
+
+const INVITE_POLLUTED_CTX = {
+  ...INVITE_BASE_CTX,
+  ai_score: 87,
+  hr_note: 'CONFIDENTIAL_HR_NOTE_TEXT',
+  other_candidates: ['CONFIDENTIAL_OTHER_CANDIDATE'],
+  application_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+};
+
+const ALLOWED_INVITE_PAYLOAD_KEYS = ['job_title'].sort();
+
+test('candidate account invite payload contains exactly the allowed keys', () => {
+  const { payload } = buildCandidateAccountInvite(INVITE_BASE_CTX);
+  assert.deepEqual(Object.keys(payload).sort(), ALLOWED_INVITE_PAYLOAD_KEYS);
+});
+
+test('candidate account invite body carries the set-password link, payload never does', () => {
+  const { body, payload } = buildCandidateAccountInvite(INVITE_BASE_CTX);
+  assert.ok(body.includes(INVITE_BASE_CTX.setPasswordUrl));
+  assert.ok(!JSON.stringify(payload).includes('SECRET_TOKEN'));
+});
+
+test('a polluted context never leaks into the candidate account invite', () => {
+  const result = buildCandidateAccountInvite(INVITE_POLLUTED_CTX);
+  const serialized = JSON.stringify(result);
+  for (const forbidden of ['ai_score', '87', 'CONFIDENTIAL_HR_NOTE_TEXT', 'CONFIDENTIAL_OTHER_CANDIDATE', 'cccccccc-cccc-cccc-cccc-cccccccccccc']) {
+    assert.ok(!serialized.includes(forbidden), `leaked forbidden value: ${forbidden}`);
+  }
+  assert.deepEqual(Object.keys(result.payload).sort(), ALLOWED_INVITE_PAYLOAD_KEYS);
+});
+
+test('an empty invite context never throws and produces sensible fallbacks', () => {
+  assert.doesNotThrow(() => buildCandidateAccountInvite({}));
+  assert.doesNotThrow(() => buildCandidateAccountInvite(undefined));
+  const { type, title, body, payload } = buildCandidateAccountInvite({});
+  assert.ok(type);
+  assert.ok(title);
+  assert.ok(body);
+  assert.ok(payload && typeof payload === 'object');
 });

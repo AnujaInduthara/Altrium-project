@@ -9,6 +9,7 @@ const { partitionSelection } = require('../utils/candidateSelection');
 const { validateStatusChange } = require('../utils/applicationStatus');
 const vacancyService = require('./vacancy.service');
 const notificationService = require('./notification.service');
+const candidateAccountService = require('./candidateAccount.service');
 
 // A typed, HTTP-aware error the controller translates straight to a response
 // without leaking internals (mirrors VacancyError in vacancy.service.js).
@@ -177,6 +178,7 @@ const APPLICATION_HR_FIELDS = [
   'selected_by',
   'status_updated_at',
   'hr_note',
+  'candidate_provisioning_note',
 ].join(', ');
 
 // All applications for one vacancy, newest first. The caller (controller) must
@@ -337,6 +339,7 @@ async function selectCandidates({ vacancyId, applicationIds, hrUserId }) {
   // this successful selection into an error (mirrors hiringDecision.service.js).
   for (const application of newlySelected) {
     notificationService.dispatchInBackground(() => notificationService.notifyCandidateSelected(application.id));
+    notificationService.dispatchInBackground(() => candidateAccountService.provisionCandidateAccount(application.id));
   }
 
   // Every requested id is now 'selected' (either just transitioned, or already
@@ -437,6 +440,7 @@ async function updateApplicationStatus({ applicationId, nextStatus, hrNote, auth
 
   if (value.next === APPLICATION_STATUS.SELECTED) {
     notificationService.dispatchInBackground(() => notificationService.notifyCandidateSelected(data.id));
+    notificationService.dispatchInBackground(() => candidateAccountService.provisionCandidateAccount(data.id));
   }
 
   return data;

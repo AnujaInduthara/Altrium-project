@@ -22,3 +22,24 @@ export function validateLoginForm({ email, password }) {
 
   return errors;
 }
+
+const MIN_PASSWORD_LENGTH = 8;
+
+// Returns a { field: message } map of the first error per field, or {} if valid.
+export function validateSetPasswordForm({ password, confirm }) {
+  const errors = {};
+
+  if (isBlank(password)) {
+    errors.password = 'Password is required.';
+  } else if (String(password).length < MIN_PASSWORD_LENGTH) {
+    errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+  }
+
+  if (isBlank(confirm)) {
+    errors.confirm = 'Please confirm your password.';
+  } else if (!errors.password && confirm !== password) {
+    errors.confirm = 'Passwords do not match.';
+  }
+
+  return errors;
+}

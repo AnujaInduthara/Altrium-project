@@ -201,6 +201,15 @@ function render({ application, vacancy, screening }) {
   statusEl.classList.add(STATUS_BADGE_CLASSES[statusKey] || 'badge--neutral');
 
   $('hr-note').value = application.hr_note || '';
+
+  const provisioningNoteEl = $('review-provisioning-note');
+  if (application.candidate_provisioning_note) {
+    provisioningNoteEl.textContent = application.candidate_provisioning_note;
+    provisioningNoteEl.hidden = false;
+  } else {
+    provisioningNoteEl.hidden = true;
+  }
+
   renderDecisionActions(statusKey);
 
   // --- applicant information

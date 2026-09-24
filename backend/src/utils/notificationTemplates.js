@@ -16,6 +16,7 @@ const NOTIFICATION_TYPES = Object.freeze({
   HIRING_DECISION_HR: 'hiring_decision_hr',
   HIRING_DECISION_CANDIDATE: 'hiring_decision_candidate',
   CANDIDATE_SELECTED: 'candidate_selected',
+  CANDIDATE_ACCOUNT_INVITE: 'candidate_account_invite',
 });
 
 function formatDate(iso) {
@@ -121,6 +122,30 @@ function buildCandidateSelected(ctx = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Candidate account invite — sent once, the first time an applicant's
+// selection provisions them a portal account (candidateAccount.service.js).
+// ---------------------------------------------------------------------------
+
+// ctx: { vacancyTitle, setPasswordUrl }. Same privacy boundary as every other
+// candidate template: only these two named ctx fields are ever read. The URL
+// is a one-time, self-service link to the candidate's OWN account, not
+// information about the hiring process, so it's the only candidate payload
+// that legitimately carries a link — it still never carries anything else
+// (no AI score, no rank, no HR note, no other candidate, no internal id).
+function buildCandidateAccountInvite(ctx = {}) {
+  return {
+    type: NOTIFICATION_TYPES.CANDIDATE_ACCOUNT_INVITE,
+    title: 'Set up your Altrium account',
+    body:
+      `Create your Altrium account to track your interview for the ${ctx.vacancyTitle || 'role'} position. ` +
+      `Set your password here: ${ctx.setPasswordUrl || ''}`,
+    payload: {
+      job_title: ctx.vacancyTitle || null,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // PB-22 — the final hiring decision.
 // ---------------------------------------------------------------------------
 
@@ -178,6 +203,7 @@ module.exports = {
   buildInterviewScheduledForInterviewer,
   buildInterviewCancelledForInterviewer,
   buildCandidateSelected,
+  buildCandidateAccountInvite,
   buildDecisionForHr,
   buildDecisionForCandidate,
 };
