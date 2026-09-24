@@ -9,9 +9,24 @@ const ROLES = Object.freeze({
   HIRING_MANAGER: 'hiring_manager',
   MANAGEMENT: 'management',
   ADMIN: 'admin',
+  // Not a staff role — see candidateAccount.service.js. Deliberately excluded
+  // from ALL_ROLES below.
+  CANDIDATE: 'candidate',
 });
 
-const ALL_ROLES = Object.freeze(Object.values(ROLES));
+// Staff roles only — deliberately NOT Object.values(ROLES). The only
+// consumer today is notification.routes.js's requireRole(...ALL_ROLES), and
+// candidate notifications are always addressed by recipient_email (see
+// notification.service.js), never recipient_profile_id. If this silently
+// picked up CANDIDATE, every candidate would become authorized to call the
+// general notifications API with no change to that route file.
+const ALL_ROLES = Object.freeze([
+  ROLES.HR,
+  ROLES.EMPLOYEE,
+  ROLES.HIRING_MANAGER,
+  ROLES.MANAGEMENT,
+  ROLES.ADMIN,
+]);
 
 // Roles that may be assigned as an interview panel member (Sprint 2). An
 // "interviewer" is not a separate role — it's any active employee, hr, or

@@ -18,6 +18,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const hiringRoutes = require('./routes/hiring.routes');
 const reportingRoutes = require('./routes/reporting.routes');
 const publicRoutes = require('./routes/public.routes');
+const candidateRoutes = require('./routes/candidate.routes');
 const { notFoundHandler, errorHandler } = require('./middleware/error.middleware');
 
 const app = express();
@@ -52,6 +53,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/hiring', hiringRoutes);
 app.use('/api/reports', reportingRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/candidate', candidateRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

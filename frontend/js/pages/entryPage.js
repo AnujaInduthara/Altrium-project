@@ -12,6 +12,7 @@ const ROLE_HOME_PAGES = {
   employee: 'employee-dashboard.html',
   hiring_manager: 'hiring-dashboard.html',
   management: 'reports.html',
+  candidate: 'my-interviews.html',
 };
 
 async function route() {

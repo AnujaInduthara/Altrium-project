@@ -152,6 +152,7 @@ async function getApplicationReview(req, res) {
         cv_size_bytes: application.cv_size_bytes,
         cv_content_type: application.cv_content_type,
         created_at: application.created_at,
+        candidate_provisioning_note: application.candidate_provisioning_note,
       },
       vacancy: {
         id: vacancy.id,
