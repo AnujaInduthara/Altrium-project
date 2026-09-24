@@ -16,7 +16,6 @@ export const NAV_ITEMS = [
   { id: 'interviews', label: 'Interviews', href: 'interviews.html', icon: 'calendar', roles: ['hr'] },
   { id: 'candidates', label: 'Candidates', href: 'candidates.html', icon: 'users', roles: ['hr'] },
   { id: 'reports', label: 'Reports', href: 'reports.html', icon: 'chart', roles: ['hr', 'management'] },
-  { id: 'settings', label: 'Settings', href: 'settings.html', icon: 'settings', roles: ['hr'] },
   {
     id: 'my-interviews',
     label: 'My Interviews',
